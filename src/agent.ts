@@ -12,19 +12,46 @@ import { createTokenizer, type Tokenizer } from "./context/tokenizer";
 import { createProvider } from "./providers/factory";
 import type { Provider } from "./providers/types";
 import { estimateCost } from "./providers/pricing";
-import { ValidationError, AbortError, OutputError } from "./errors";
+import { ValidationError, AbortError, OutputError, ProviderError } from "./errors";
+import { getOAuthApiKey } from "./oauth/index";
 
 export class Agent<TState> {
   private config: AgentConfig<TState>;
   private state: TState | undefined;
   private history: ValidatedHistoryEntry[] = [];
-  private provider: Provider;
+  private provider: Provider | undefined;
   private tokenizer: Tokenizer;
 
   constructor(config: AgentConfig<TState>) {
     this.config = config;
-    this.provider = createProvider(config.provider);
     this.tokenizer = createTokenizer(config.provider.type, config.provider.model);
+
+    // Create provider immediately if we have an apiKey or OAuth isn't requested
+    if (config.provider.apiKey || !config.provider.oauth) {
+      this.provider = createProvider(config.provider);
+    }
+  }
+
+  private async resolveProvider(): Promise<Provider> {
+    if (this.provider) return this.provider;
+
+    // OAuth is requested but no apiKey — try stored credentials
+    const oauthProviderId = this.config.provider.type === "openai" ? "openai" : "anthropic";
+    const result = await getOAuthApiKey(oauthProviderId);
+
+    if (!result) {
+      throw new ProviderError(
+        this.config.provider.type,
+        `No stored OAuth credentials for ${oauthProviderId}. Run the login flow first using the exported OAuth providers.`
+      );
+    }
+
+    this.provider = createProvider({
+      ...this.config.provider,
+      apiKey: result.apiKey,
+    });
+
+    return this.provider;
   }
 
   setState(state: TState): void {
@@ -77,8 +104,9 @@ export class Agent<TState> {
         providerType: this.config.provider.type,
       });
 
+      const provider = await this.resolveProvider();
       const start = performance.now();
-      const response = await this.provider.sendRequest({
+      const response = await provider.sendRequest({
         messages: assembled.messages,
         outputSchema: assembled.outputSchema,
         model: this.config.provider.model,
