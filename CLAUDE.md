@@ -64,13 +64,47 @@ scripts/
 
 ## Commands
 
+- `bun run build` — Compile TypeScript to `dist/` (JS + declarations + source maps)
 - `bun test` — Run all tests (75 tests, ~1.3s)
+- `bun run lint` — Lint with Biome
+- `bun run lint:fix` — Auto-fix lint issues
+- `bun run typecheck` — Type check without emitting
 - `bun scripts/e2e-live.ts` — Live e2e against local vLLM (default)
 - `PROVIDER=openai OPENAI_API_KEY=... bun scripts/e2e-live.ts` — Against OpenAI
 - `PROVIDER=anthropic ANTHROPIC_API_KEY=... bun scripts/e2e-live.ts` — Against Anthropic
-- `bunx biome check src/ tests/ scripts/` — Lint
-- `bunx biome check --write src/ tests/ scripts/` — Auto-fix lint
-- `bunx tsc --noEmit` — Type check
+
+## Commit Conventions
+
+This project uses **Conventional Commits** enforced by commitlint. Every commit message must follow this format:
+
+```
+type(scope): description
+```
+
+**Types:** `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
+
+- `feat` — new feature (triggers minor version bump)
+- `fix` — bug fix (triggers patch version bump)
+- `feat!` or `fix!` or `BREAKING CHANGE:` in footer — triggers major version bump
+- All other types — no version bump
+
+**Rules:**
+- Type is required, scope is optional
+- Description must be lowercase, no period at end
+- Keep the subject line under 100 characters
+- Use the body for additional context when needed
+
+**Examples:**
+```
+feat: add openrouter provider support
+fix(anthropic): handle empty content blocks in response
+refactor: extract shared action parser from providers
+test: add budget enforcement edge cases
+chore(deps): bump openai sdk to v7
+feat!: remove deprecated setRules API
+```
+
+**Versioning:** Handled automatically by semantic-release on main. Never manually edit the version in package.json.
 
 ## Code Style
 
