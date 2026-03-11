@@ -9,11 +9,10 @@
     "zod": "^4.3.6"
   },
   "peerDependencies": {
-    "zod": ">=3.0.0"
+    "zod": ">=4.0.0"
   },
   "dependencies": {
     "openai": "^6.27.0",
-    "tiktoken": "^1.0.22",
-    "zod-to-json-schema": "^3.25.1"
+    "tiktoken": "^1.0.22"
   }
 }

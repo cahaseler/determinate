@@ -119,7 +119,9 @@ export class Agent<TState> {
 
 			const toolDef = this.config.tools.find((t) => t.name === response.action.tool);
 			if (toolDef) {
-				const paramsResult = toolDef.params.safeParse(response.action.params);
+				// Strip the tool_name discriminant injected by the output schema
+				const { tool_name: _, ...cleanParams } = response.action.params;
+				const paramsResult = toolDef.params.safeParse(cleanParams);
 				if (!paramsResult.success) {
 					throw new OutputError(
 						`Params for tool "${response.action.tool}" failed validation: ${paramsResult.error.issues.map((i) => i.message).join(", ")}`,

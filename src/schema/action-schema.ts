@@ -1,5 +1,4 @@
-import type { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod";
 
 interface ToolForSchema {
 	name: string;
@@ -15,10 +14,7 @@ export function generateActionSchema(tools: ToolForSchema[]): Record<string, unk
 	const toolNames = tools.map((t) => t.name);
 
 	const paramBranches = tools.map((tool) => {
-		// Cast needed: zod-to-json-schema types expect Zod v3, but Zod v4 is API-compatible
-		const baseSchema = zodToJsonSchema(tool.params as any, {
-			$refStrategy: "none",
-		}) as Record<string, any>;
+		const baseSchema = z.toJSONSchema(tool.params) as Record<string, any>;
 
 		return {
 			type: "object",
