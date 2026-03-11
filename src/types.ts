@@ -13,7 +13,6 @@ export interface ProviderConfig {
 
 export interface TokenBudgets {
 	instructions: number;
-	state: number;
 	history: number;
 	tools: number;
 }

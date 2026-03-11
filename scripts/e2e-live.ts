@@ -102,7 +102,7 @@ await runTest("warmup request", async () => {
 		],
 		instructions: () => "Respond with a ping.",
 		context: {
-			budgets: { instructions: 5000, state: 2000, history: 5000, tools: 2000 },
+			budgets: { instructions: 5000, history: 5000, tools: 2000 },
 		},
 	});
 	agent.setState({ x: 1 });
@@ -131,7 +131,7 @@ await runTest("basic single-tool decision", async () => {
 		instructions: (s) =>
 			`You are a smart home controller. The current temperature is ${s.temperature}°${s.unit === "celsius" ? "C" : "F"}. It's too cold. Set the thermostat to a comfortable temperature (around 22°C or 72°F).`,
 		context: {
-			budgets: { instructions: 5000, state: 2000, history: 5000, tools: 2000 },
+			budgets: { instructions: 5000, history: 5000, tools: 2000 },
 		},
 	});
 
@@ -194,7 +194,7 @@ await runTest("multi-tool choice based on state", async () => {
 		instructions: (s) =>
 			`You are a productivity assistant. The user wants to perform a "${s.taskType}" task. Their request: "${s.message}". Choose the appropriate action and fill in reasonable parameters.`,
 		context: {
-			budgets: { instructions: 5000, state: 2000, history: 5000, tools: 2000 },
+			budgets: { instructions: 5000, history: 5000, tools: 2000 },
 		},
 	});
 
@@ -245,7 +245,7 @@ await runTest("validWhen filters tools correctly", async () => {
 		instructions: () =>
 			"You are a customer support agent. The customer is asking for help. Provide basic support.",
 		context: {
-			budgets: { instructions: 5000, state: 2000, history: 5000, tools: 2000 },
+			budgets: { instructions: 5000, history: 5000, tools: 2000 },
 		},
 	});
 
@@ -289,7 +289,7 @@ await runTest("history context influences decision", async () => {
 		instructions: (s) =>
 			`You are a form-filling assistant. You need to collect: name, email, phone. So far you have collected: [${s.data.collected.join(", ")}]. Collect the next missing field.`,
 		context: {
-			budgets: { instructions: 5000, state: 2000, history: 10000, tools: 2000 },
+			budgets: { instructions: 5000, history: 10000, tools: 2000 },
 		},
 	});
 
@@ -333,7 +333,7 @@ await runTest("verbose mode returns assembled context", async () => {
 		],
 		instructions: () => "Increment the counter by 1.",
 		context: {
-			budgets: { instructions: 5000, state: 2000, history: 5000, tools: 2000 },
+			budgets: { instructions: 5000, history: 5000, tools: 2000 },
 		},
 	});
 
@@ -377,7 +377,7 @@ await runTest("timeout aborts long requests", async () => {
 		],
 		instructions: () => "Do nothing.",
 		context: {
-			budgets: { instructions: 5000, state: 2000, history: 5000, tools: 2000 },
+			budgets: { instructions: 5000, history: 5000, tools: 2000 },
 		},
 	});
 

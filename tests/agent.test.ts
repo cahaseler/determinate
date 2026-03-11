@@ -27,7 +27,6 @@ const baseConfig = {
 	context: {
 		budgets: {
 			instructions: 5000,
-			state: 5000,
 			history: 5000,
 			tools: 5000,
 		},

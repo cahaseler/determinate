@@ -79,7 +79,6 @@ describe("end-to-end with mock server", () => {
 			context: {
 				budgets: {
 					instructions: 5000,
-					state: 5000,
 					history: 5000,
 					tools: 5000,
 				},
@@ -129,7 +128,7 @@ describe("end-to-end with mock server", () => {
 			],
 			instructions: () => "test",
 			context: {
-				budgets: { instructions: 5000, state: 5000, history: 5000, tools: 5000 },
+				budgets: { instructions: 5000, history: 5000, tools: 5000 },
 			},
 		});
 

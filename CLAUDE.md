@@ -11,7 +11,7 @@ Consumer Loop
   └─> agent.nextAction()
         ├─ Filter tools by validWhen predicates
         ├─ Generate discriminated union JSON Schema from valid tools
-        ├─ Assemble context (instructions, state, history, tool descriptions)
+        ├─ Assemble context (instructions, history, tool descriptions)
         ├─ Enforce per-section token budgets
         ├─ Translate to provider format (OpenAI or Anthropic)
         ├─ Single LLM call with constrained structured output
@@ -27,7 +27,8 @@ Consumer Loop
 - **History formatted as provider-native tool-calling messages** (tool_use/tool_result for Anthropic, tool_calls/tool for OpenAI). This exploits model training on tool-calling patterns.
 - **Anthropic provider** is a raw fetch adapter (no SDK). Uses `output_config.format` for structured output, implements its own retry with exponential backoff.
 - **OpenAI provider** uses the official OpenAI SDK. Handles OpenAI, vLLM, and OpenRouter via `baseUrl`.
-- **Token budgeting** rejects (throws `BudgetExceededError`) if any section exceeds its budget. No silent truncation.
+- **State is not sent to the model** — state is only passed to `instructions(state)` and `validWhen(state)`. The consumer controls what the model sees through the instructions function.
+- **Token budgeting** rejects (throws `BudgetExceededError`) if any section (instructions, history, tools) exceeds its budget. No silent truncation.
 - **OAuth** extracted from pi-ai (MIT). Supports Anthropic and OpenAI device code flows. Tokens stored at `~/.determinate/` with 0o600 permissions.
 
 ## Project Structure

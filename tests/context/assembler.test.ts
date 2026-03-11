@@ -59,7 +59,6 @@ const tools: ToolDefinition<TestState>[] = [
 
 const bigBudgets: TokenBudgets = {
 	instructions: 10000,
-	state: 10000,
 	history: 10000,
 	tools: 10000,
 };
@@ -92,7 +91,7 @@ describe("context assembler", () => {
 		expect(systemMsg.content as string).toContain("0.3");
 	});
 
-	it("includes state in user message", () => {
+	it("does not include raw state in user message", () => {
 		const result = assembleContext({
 			state: { status: "pending", score: 0.3 },
 			tools,
@@ -103,8 +102,8 @@ describe("context assembler", () => {
 			providerType: "openai",
 		});
 		const userMsg = findMessage(result.messages, (m) => m.role === "user");
-		expect(userMsg.content as string).toContain("pending");
-		expect(userMsg.content as string).toContain("0.3");
+		expect(userMsg.content as string).not.toContain("pending");
+		expect(userMsg.content as string).not.toContain("0.3");
 	});
 
 	it("throws NoValidToolsError when no tools match", () => {
