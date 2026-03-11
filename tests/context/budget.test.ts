@@ -14,7 +14,6 @@ const mockTokenizer: Tokenizer = {
 describe("budget enforcement", () => {
 	const budgets: TokenBudgets = {
 		instructions: 100,
-		state: 50,
 		history: 30,
 		tools: 40,
 	};
@@ -22,7 +21,6 @@ describe("budget enforcement", () => {
 	it("passes when all sections are within budget", () => {
 		const sections = {
 			instructions: "a".repeat(50),
-			state: "b".repeat(30),
 			history: "c".repeat(20),
 			tools: "d".repeat(25),
 		};
@@ -32,7 +30,6 @@ describe("budget enforcement", () => {
 	it("throws BudgetExceededError when instructions exceed budget", () => {
 		const sections = {
 			instructions: "a".repeat(150),
-			state: "b".repeat(10),
 			history: "c".repeat(10),
 			tools: "d".repeat(10),
 		};
@@ -50,7 +47,6 @@ describe("budget enforcement", () => {
 	it("throws for the first section that exceeds budget", () => {
 		const sections = {
 			instructions: "a".repeat(200),
-			state: "b".repeat(200),
 			history: "c".repeat(10),
 			tools: "d".repeat(10),
 		};
@@ -66,13 +62,11 @@ describe("budget enforcement", () => {
 	it("returns token counts for all sections", () => {
 		const sections = {
 			instructions: "a".repeat(50),
-			state: "b".repeat(30),
 			history: "c".repeat(20),
 			tools: "d".repeat(25),
 		};
 		const counts = enforceBudgets(sections, budgets, mockTokenizer);
 		expect(counts.instructions).toBe(50);
-		expect(counts.state).toBe(30);
 		expect(counts.history).toBe(20);
 		expect(counts.tools).toBe(25);
 	});

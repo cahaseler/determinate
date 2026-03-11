@@ -46,10 +46,7 @@ export function assembleContext<TState>(input: AssembleInput<TState>): Assembled
 	// 4. Build tool descriptions
 	const toolDescriptions = validTools.map((t) => `- ${t.name}: ${t.description}`).join("\n");
 
-	// 5. Serialize state
-	const stateText = JSON.stringify(state, null, 2);
-
-	// 6. Build history messages (needed for accurate budget counting)
+	// 5. Build history messages (needed for accurate budget counting)
 	const historyMessages: unknown[] = [];
 	for (const entry of history) {
 		const callId = randomUUID();
@@ -89,12 +86,11 @@ export function assembleContext<TState>(input: AssembleInput<TState>): Assembled
 		}
 	}
 
-	// 7. Enforce budgets
+	// 6. Enforce budgets
 	const historyText = historyMessages.length > 0 ? JSON.stringify(historyMessages) : "";
 	enforceBudgets(
 		{
 			instructions: fullInstructions,
-			state: stateText,
 			history: historyText,
 			tools: toolDescriptions,
 		},
@@ -102,7 +98,7 @@ export function assembleContext<TState>(input: AssembleInput<TState>): Assembled
 		tokenizer,
 	);
 
-	// 8. Build final messages
+	// 7. Build final messages
 	const messages: unknown[] = [];
 	messages.push({
 		role: "system",
@@ -111,7 +107,7 @@ export function assembleContext<TState>(input: AssembleInput<TState>): Assembled
 	messages.push(...historyMessages);
 	messages.push({
 		role: "user",
-		content: `Current state:\n${stateText}\n\nChoose the next action.`,
+		content: "Choose the next action.",
 	});
 
 	return { messages, outputSchema, validTools: validTools.map((t) => t.name) };

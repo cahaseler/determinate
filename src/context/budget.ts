@@ -4,7 +4,6 @@ import type { Tokenizer } from "./tokenizer";
 
 export interface SectionContents {
 	instructions: string;
-	state: string;
 	history: string;
 	tools: string;
 }
@@ -16,7 +15,7 @@ export function enforceBudgets(
 ): Record<keyof TokenBudgets, number> {
 	const counts: Record<string, number> = {};
 
-	for (const key of ["instructions", "state", "history", "tools"] as const) {
+	for (const key of ["instructions", "history", "tools"] as const) {
 		const count = tokenizer.count(sections[key]);
 		counts[key] = count;
 		if (count > budgets[key]) {
