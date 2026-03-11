@@ -3,7 +3,7 @@ import { createProvider } from "../../src/providers/factory";
 
 describe("provider factory", () => {
 	it("throws for unknown provider type", () => {
-		expect(() => createProvider({ type: "unknown" as any, model: "x" })).toThrow();
+		expect(() => createProvider({ type: "unknown" as unknown as "openai", model: "x" })).toThrow();
 	});
 
 	it("creates an openai provider", () => {

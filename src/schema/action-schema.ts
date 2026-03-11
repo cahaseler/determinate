@@ -6,6 +6,12 @@ interface ToolForSchema {
 	params: z.ZodType;
 }
 
+interface JsonSchemaObject {
+	properties?: Record<string, unknown>;
+	required?: string[];
+	[key: string]: unknown;
+}
+
 export function generateActionSchema(tools: ToolForSchema[]): Record<string, unknown> {
 	if (tools.length === 0) {
 		throw new Error("Cannot generate action schema with zero tools");
@@ -14,7 +20,7 @@ export function generateActionSchema(tools: ToolForSchema[]): Record<string, unk
 	const toolNames = tools.map((t) => t.name);
 
 	const paramBranches = tools.map((tool) => {
-		const baseSchema = z.toJSONSchema(tool.params) as Record<string, any>;
+		const baseSchema = z.toJSONSchema(tool.params) as JsonSchemaObject;
 
 		return {
 			type: "object",

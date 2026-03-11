@@ -37,6 +37,6 @@ export function createTokenizer(providerType: string, model: string): Tokenizer 
 	if (providerType === "openai" || providerType === "openrouter" || providerType === "vllm") {
 		return new TiktokenTokenizer(model);
 	}
-	// Anthropic will use their token counting API in a future version
+	// Anthropic doesn't use tiktoken — approximate by character count
 	return new CharApproximationTokenizer();
 }

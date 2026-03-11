@@ -68,14 +68,16 @@ scripts/
 - `bun scripts/e2e-live.ts` — Live e2e against local vLLM (default)
 - `PROVIDER=openai OPENAI_API_KEY=... bun scripts/e2e-live.ts` — Against OpenAI
 - `PROVIDER=anthropic ANTHROPIC_API_KEY=... bun scripts/e2e-live.ts` — Against Anthropic
-- `bunx biome check src/ tests/` — Lint
-- `bunx biome check --write src/ tests/` — Auto-fix lint
+- `bunx biome check src/ tests/ scripts/` — Lint
+- `bunx biome check --write src/ tests/ scripts/` — Auto-fix lint
 - `bunx tsc --noEmit` — Type check
 
 ## Code Style
 
 - **Biome** for linting and formatting (tabs, 100 width)
-- **No `any`** lint rule is disabled — `as any` casts are acceptable where needed
+- **No `any` anywhere** — `noExplicitAny` is an error. Use `unknown` and narrow with type assertions to specific interfaces. For untyped API responses (e.g. `fetch().json()`), cast to a named interface, not `any`. In tests, use `as unknown as TargetType` for intentionally invalid inputs.
+- **No non-null assertions** (`!`) — use fallback values (`?? []`, `?? ""`) or guard checks instead.
+- **No unused code** — `noUnusedVariables`, `noUnusedImports`, `noUnusedFunctionParameters` are all errors.
 - Follow existing patterns. Match surrounding code style.
 
 ## Dependencies

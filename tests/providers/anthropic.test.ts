@@ -9,8 +9,9 @@ describe("Anthropic provider", () => {
 		server = Bun.serve({
 			port: 0,
 			fetch(req) {
-				return req.json().then((body: any) => {
-					const hasOutputConfig = body.output_config?.format?.type === "json_schema";
+				return req.json().then((body: Record<string, unknown>) => {
+					const outputConfig = body.output_config as { format?: { type?: string } } | undefined;
+					const hasOutputConfig = outputConfig?.format?.type === "json_schema";
 
 					return Response.json({
 						id: "msg-test",

@@ -19,7 +19,9 @@ export function createProvider(config: ProviderConfig): Provider {
 			});
 		case "anthropic":
 			return new AnthropicProvider(config);
-		default:
-			throw new Error(`Unknown provider type: ${(config as any).type}`);
+		default: {
+			const exhaustive: never = config.type;
+			throw new Error(`Unknown provider type: ${exhaustive}`);
+		}
 	}
 }

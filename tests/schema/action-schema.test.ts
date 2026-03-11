@@ -2,6 +2,18 @@ import { describe, expect, it } from "bun:test";
 import { z } from "zod";
 import { generateActionSchema } from "../../src/schema/action-schema";
 
+interface SchemaProperties {
+	tool?: { enum?: string[] };
+	params?: {
+		anyOf?: Array<{
+			properties: Record<string, { type?: string; enum?: string[] }>;
+			required?: string[];
+			additionalProperties?: boolean;
+		}>;
+		properties?: Record<string, unknown>;
+	};
+}
+
 describe("action schema generation", () => {
 	const tools = [
 		{
@@ -24,29 +36,30 @@ describe("action schema generation", () => {
 
 	it("includes tool as a property with enum of tool names", () => {
 		const schema = generateActionSchema(tools);
-		const toolProp = (schema.properties as any).tool;
-		expect(toolProp.enum).toContain("approve_order");
-		expect(toolProp.enum).toContain("reject_order");
-		expect(toolProp.enum).toHaveLength(2);
+		const props = schema.properties as SchemaProperties;
+		expect(props.tool?.enum).toContain("approve_order");
+		expect(props.tool?.enum).toContain("reject_order");
+		expect(props.tool?.enum).toHaveLength(2);
 	});
 
 	it("includes params with anyOf branches for multiple tools", () => {
 		const schema = generateActionSchema(tools);
-		const params = (schema.properties as any).params;
-		expect(params.anyOf).toBeDefined();
-		expect(params.anyOf).toHaveLength(2);
+		const props = schema.properties as SchemaProperties;
+		expect(props.params?.anyOf).toBeDefined();
+		expect(props.params?.anyOf).toHaveLength(2);
 	});
 
 	it("each anyOf branch includes a tool_name enum discriminant", () => {
 		const schema = generateActionSchema(tools);
-		const branches = (schema.properties as any).params.anyOf;
-		// Should use single-value enum, not const
+		const props = schema.properties as SchemaProperties;
+		const branches = props.params?.anyOf ?? [];
+		expect(branches).toHaveLength(2);
 		for (const branch of branches) {
 			expect(branch.properties.tool_name.type).toBe("string");
 			expect(branch.properties.tool_name.enum).toBeDefined();
 			expect(branch.properties.tool_name.enum).toHaveLength(1);
 		}
-		const toolNames = branches.map((b: any) => b.properties.tool_name.enum[0]);
+		const toolNames = branches.map((b) => b.properties.tool_name.enum?.[0]);
 		expect(toolNames).toContain("approve_order");
 		expect(toolNames).toContain("reject_order");
 	});
@@ -54,7 +67,9 @@ describe("action schema generation", () => {
 	it("sets additionalProperties to false on root and branches", () => {
 		const schema = generateActionSchema(tools);
 		expect(schema.additionalProperties).toBe(false);
-		const branches = (schema.properties as any).params.anyOf;
+		const props = schema.properties as SchemaProperties;
+		const branches = props.params?.anyOf ?? [];
+		expect(branches).toHaveLength(2);
 		for (const branch of branches) {
 			expect(branch.additionalProperties).toBe(false);
 		}
@@ -68,10 +83,9 @@ describe("action schema generation", () => {
 
 	it("handles single tool without anyOf wrapper", () => {
 		const schema = generateActionSchema([tools[0]]);
-		const toolProp = (schema.properties as any).tool;
-		expect(toolProp.enum).toEqual(["approve_order"]);
-		// Single tool: params is the schema directly, no anyOf
-		const params = (schema.properties as any).params;
+		const props = schema.properties as SchemaProperties;
+		expect(props.tool?.enum).toEqual(["approve_order"]);
+		const params = props.params as { anyOf?: unknown; properties?: Record<string, unknown> };
 		expect(params.anyOf).toBeUndefined();
 		expect(params.properties).toBeDefined();
 	});
@@ -82,7 +96,9 @@ describe("action schema generation", () => {
 
 	it("all branch properties are listed in required", () => {
 		const schema = generateActionSchema(tools);
-		const branches = (schema.properties as any).params.anyOf;
+		const props = schema.properties as SchemaProperties;
+		const branches = props.params?.anyOf ?? [];
+		expect(branches.length).toBeGreaterThan(0);
 		for (const branch of branches) {
 			const propNames = Object.keys(branch.properties);
 			for (const name of propNames) {

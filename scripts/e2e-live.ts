@@ -64,7 +64,7 @@ const results: TestResult[] = [];
 
 async function runTest(
 	name: string,
-	fn: () => Promise<Record<string, unknown> | void>,
+	fn: () => Promise<Record<string, unknown> | undefined>,
 ): Promise<void> {
 	const start = performance.now();
 	process.stdout.write(`  ${name} ... `);
@@ -85,9 +85,7 @@ async function runTest(
 // ── Tests ──────────────────────────────────────────────────────────
 
 const providerConfig = getProviderConfig();
-console.log(
-	`\nRunning live e2e tests against ${providerConfig.type} (${providerConfig.model})\n`,
-);
+console.log(`\nRunning live e2e tests against ${providerConfig.type} (${providerConfig.model})\n`);
 
 // Warmup: first inference can be very slow (Triton autotuning, CUDA graph capture)
 await runTest("warmup request", async () => {
@@ -256,9 +254,7 @@ await runTest("validWhen filters tools correctly", async () => {
 	const result = await agent.nextAction({ timeout: 120000 });
 
 	if (result.action.tool !== "basic_support") {
-		throw new Error(
-			`Expected "basic_support" (only valid tool), got "${result.action.tool}"`,
-		);
+		throw new Error(`Expected "basic_support" (only valid tool), got "${result.action.tool}"`);
 	}
 
 	return { action: result.action, model: result.meta.model };
@@ -347,7 +343,10 @@ await runTest("verbose mode returns assembled context", async () => {
 	if (!("context" in result)) {
 		throw new Error("Verbose result missing 'context' field");
 	}
-	const verbose = result as any;
+	const verbose = result as {
+		action: typeof result.action;
+		context: { messages: unknown[]; outputSchema: Record<string, unknown>; validTools: string[] };
+	};
 	if (!verbose.context.messages || !verbose.context.outputSchema) {
 		throw new Error("Verbose context missing messages or outputSchema");
 	}
@@ -387,9 +386,10 @@ await runTest("timeout aborts long requests", async () => {
 	try {
 		await agent.nextAction({ timeout: 1 }); // 1ms — should definitely time out
 		throw new Error("Expected timeout error but request succeeded");
-	} catch (err: any) {
-		if (err.name !== "AbortError" && !err.message.includes("abort")) {
-			throw new Error(`Expected AbortError, got ${err.name}: ${err.message}`);
+	} catch (err: unknown) {
+		const error = err as Error;
+		if (error.name !== "AbortError" && !error.message.includes("abort")) {
+			throw new Error(`Expected AbortError, got ${error.name}: ${error.message}`);
 		}
 	}
 

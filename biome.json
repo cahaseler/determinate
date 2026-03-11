@@ -4,8 +4,24 @@
     "enabled": true,
     "rules": {
       "recommended": true,
+      "correctness": {
+        "noUnusedVariables": "error",
+        "noUnusedImports": "error",
+        "noUnusedFunctionParameters": "error"
+      },
       "suspicious": {
-        "noExplicitAny": "off"
+        "noExplicitAny": "error",
+        "noImplicitAnyLet": "error",
+        "noConfusingVoidType": "error",
+        "noUnsafeDeclarationMerging": "error",
+        "noExtraNonNullAssertion": "error"
+      },
+      "style": {
+        "noNonNullAssertion": "error",
+        "useConst": "error"
+      },
+      "complexity": {
+        "noBannedTypes": "error"
       }
     }
   },
@@ -15,6 +31,6 @@
     "lineWidth": 100
   },
   "files": {
-    "includes": ["src/**", "tests/**"]
+    "includes": ["src/**", "tests/**", "scripts/**"]
   }
 }

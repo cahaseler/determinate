@@ -92,9 +92,13 @@ export class AnthropicProvider implements Provider {
 					throw new ProviderError("anthropic", `HTTP ${response.status}: ${errorBody}`);
 				}
 
-				const data = (await response.json()) as any;
+				const data = (await response.json()) as {
+					content?: Array<{ type: string; text?: string }>;
+					usage?: { input_tokens?: number; output_tokens?: number };
+					model?: string;
+				};
 
-				const textBlock = data.content?.find((b: any) => b.type === "text");
+				const textBlock = data.content?.find((b) => b.type === "text");
 				if (!textBlock?.text) {
 					throw new OutputError(
 						"No text content in Anthropic response",

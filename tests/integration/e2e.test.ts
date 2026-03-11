@@ -138,7 +138,9 @@ describe("end-to-end with mock server", () => {
 		const result = await agent.nextAction({ verbose: true });
 
 		expect("context" in result).toBe(true);
-		const verbose = result as any;
+		const verbose = result as {
+			context: { messages: unknown[]; outputSchema: unknown; validTools: string[] };
+		};
 		expect(verbose.context.messages).toBeDefined();
 		expect(verbose.context.outputSchema).toBeDefined();
 		expect(verbose.context.validTools).toContain("approve_order");

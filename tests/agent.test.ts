@@ -47,7 +47,9 @@ describe("agent", () => {
 
 	it("setState rejects invalid state", () => {
 		const agent = createAgent(baseConfig);
-		expect(() => agent.setState({ status: "invalid", score: 0.5 } as any)).toThrow(ValidationError);
+		expect(() =>
+			agent.setState({ status: "invalid", score: 0.5 } as unknown as z.infer<typeof stateSchema>),
+		).toThrow(ValidationError);
 	});
 
 	it("getState returns the current state", () => {
@@ -71,7 +73,13 @@ describe("agent", () => {
 
 	it("setHistory rejects invalid format", () => {
 		const agent = createAgent(baseConfig);
-		expect(() => agent.setHistory([{ bad: "data" }] as any)).toThrow(ValidationError);
+		expect(() =>
+			agent.setHistory([{ bad: "data" }] as unknown as {
+				tool: string;
+				params: Record<string, unknown>;
+				result: string;
+			}[]),
+		).toThrow(ValidationError);
 	});
 
 	it("getHistory returns current history", () => {

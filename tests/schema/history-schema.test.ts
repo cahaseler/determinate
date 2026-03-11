@@ -28,16 +28,24 @@ describe("history validation", () => {
 	});
 
 	it("rejects entry missing tool field", () => {
-		const entry = { params: {}, result: "x" };
-		expect(() => validateHistory([entry as any])).toThrow();
+		const entry = { params: {}, result: "x" } as unknown as {
+			tool: string;
+			params: Record<string, unknown>;
+			result: string;
+		};
+		expect(() => validateHistory([entry])).toThrow();
 	});
 
 	it("rejects entry with wrong type for result", () => {
-		const entry = { tool: "x", params: {}, result: 42 };
-		expect(() => validateHistory([entry as any])).toThrow();
+		const entry = { tool: "x", params: {}, result: 42 } as unknown as {
+			tool: string;
+			params: Record<string, unknown>;
+			result: string;
+		};
+		expect(() => validateHistory([entry])).toThrow();
 	});
 
 	it("rejects non-array input", () => {
-		expect(() => validateHistory("not an array" as any)).toThrow();
+		expect(() => validateHistory("not an array" as unknown as unknown[])).toThrow();
 	});
 });

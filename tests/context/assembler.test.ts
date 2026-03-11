@@ -5,6 +5,23 @@ import type { Tokenizer } from "../../src/context/tokenizer";
 import { BudgetExceededError, NoValidToolsError } from "../../src/errors";
 import type { HistoryEntry, TokenBudgets, ToolDefinition } from "../../src/types";
 
+interface MessageLike {
+	role: string;
+	content?: unknown;
+	tool_calls?: unknown[];
+	tool_call_id?: string;
+}
+
+function asMessage(m: unknown): MessageLike {
+	return m as MessageLike;
+}
+
+function findMessage(messages: unknown[], predicate: (m: MessageLike) => boolean): MessageLike {
+	const found = messages.find((m) => predicate(asMessage(m)));
+	if (!found) throw new Error("Message not found");
+	return asMessage(found);
+}
+
 const mockTokenizer: Tokenizer = {
 	count: (input) => {
 		const str = typeof input === "string" ? input : JSON.stringify(input);
@@ -71,8 +88,8 @@ describe("context assembler", () => {
 			tokenizer: mockTokenizer,
 			providerType: "openai",
 		});
-		const systemMsg = result.messages.find((m: any) => m.role === "system") as any;
-		expect(systemMsg.content).toContain("0.3");
+		const systemMsg = findMessage(result.messages, (m) => m.role === "system");
+		expect(systemMsg.content as string).toContain("0.3");
 	});
 
 	it("includes state in user message", () => {
@@ -85,9 +102,9 @@ describe("context assembler", () => {
 			tokenizer: mockTokenizer,
 			providerType: "openai",
 		});
-		const userMsg = result.messages.find((m: any) => m.role === "user") as any;
-		expect(userMsg.content).toContain("pending");
-		expect(userMsg.content).toContain("0.3");
+		const userMsg = findMessage(result.messages, (m) => m.role === "user");
+		expect(userMsg.content as string).toContain("pending");
+		expect(userMsg.content as string).toContain("0.3");
 	});
 
 	it("throws NoValidToolsError when no tools match", () => {
@@ -117,8 +134,10 @@ describe("context assembler", () => {
 			tokenizer: mockTokenizer,
 			providerType: "openai",
 		});
-		const assistantMsg = result.messages.find((m: any) => m.role === "assistant" && m.tool_calls);
-		const toolMsg = result.messages.find((m: any) => m.role === "tool");
+		const assistantMsg = result.messages.find(
+			(m) => asMessage(m).role === "assistant" && asMessage(m).tool_calls,
+		);
+		const toolMsg = result.messages.find((m) => asMessage(m).role === "tool");
 		expect(assistantMsg).toBeDefined();
 		expect(toolMsg).toBeDefined();
 	});
@@ -136,15 +155,20 @@ describe("context assembler", () => {
 			tokenizer: mockTokenizer,
 			providerType: "anthropic",
 		});
-		const assistantMsg = result.messages.find(
-			(m: any) => m.role === "assistant" && Array.isArray(m.content),
-		) as any;
-		expect(assistantMsg).toBeDefined();
-		expect(assistantMsg.content[0].type).toBe("tool_use");
-		const userResultMsg = result.messages.find(
-			(m: any) =>
-				m.role === "user" && Array.isArray(m.content) && m.content[0]?.type === "tool_result",
+		const assistantMsg = findMessage(
+			result.messages,
+			(m) => m.role === "assistant" && Array.isArray(m.content),
 		);
+		expect(assistantMsg).toBeDefined();
+		const content = assistantMsg.content as Array<{ type: string }>;
+		expect(content[0].type).toBe("tool_use");
+		const userResultMsg = result.messages.find((m) => {
+			const msg = asMessage(m);
+			const contentArr = msg.content as Array<{ type?: string }> | undefined;
+			return (
+				msg.role === "user" && Array.isArray(contentArr) && contentArr[0]?.type === "tool_result"
+			);
+		});
 		expect(userResultMsg).toBeDefined();
 	});
 
@@ -173,8 +197,9 @@ describe("context assembler", () => {
 			providerType: "openai",
 		});
 		expect(result.outputSchema).toBeDefined();
-		expect((result.outputSchema as any).properties?.tool).toBeDefined();
-		expect((result.outputSchema as any).properties?.params).toBeDefined();
+		const props = result.outputSchema.properties as Record<string, unknown> | undefined;
+		expect(props?.tool).toBeDefined();
+		expect(props?.params).toBeDefined();
 	});
 
 	it("includes per-tool instructions for valid tools", () => {
@@ -196,7 +221,7 @@ describe("context assembler", () => {
 			tokenizer: mockTokenizer,
 			providerType: "openai",
 		});
-		const systemMsg = result.messages.find((m: any) => m.role === "system") as any;
-		expect(systemMsg.content).toContain("policy X");
+		const systemMsg = findMessage(result.messages, (m) => m.role === "system");
+		expect(systemMsg.content as string).toContain("policy X");
 	});
 });
