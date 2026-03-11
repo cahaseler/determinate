@@ -1,18 +1,61 @@
 {
-  "name": "determinate",
-  "module": "src/index.ts",
-  "type": "module",
-  "private": true,
-  "devDependencies": {
-    "@biomejs/biome": "^2.4.6",
-    "@types/bun": "^1.3.10",
-    "zod": "^4.3.6"
-  },
-  "peerDependencies": {
-    "zod": ">=4.0.0"
-  },
-  "dependencies": {
-    "openai": "^6.27.0",
-    "tiktoken": "^1.0.22"
-  }
+	"name": "determinate",
+	"version": "0.0.0",
+	"description": "Decision engine that treats LLMs as next-action predictors with constrained structured output",
+	"type": "module",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"files": ["dist", "README.md", "LICENSE"],
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"test": "bun test",
+		"lint": "bunx biome check src/ tests/ scripts/",
+		"lint:fix": "bunx biome check --write src/ tests/ scripts/",
+		"typecheck": "tsc --noEmit",
+		"prepare": "husky"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/cahaseler/determinate.git"
+	},
+	"keywords": [
+		"llm",
+		"ai",
+		"agent",
+		"decision-engine",
+		"structured-output",
+		"openai",
+		"anthropic",
+		"vllm"
+	],
+	"author": "cahaseler",
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/cahaseler/determinate/issues"
+	},
+	"homepage": "https://github.com/cahaseler/determinate#readme",
+	"peerDependencies": {
+		"zod": ">=4.0.0"
+	},
+	"dependencies": {
+		"openai": "^6.27.0",
+		"tiktoken": "^1.0.22"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.6",
+		"@commitlint/cli": "^20.4.3",
+		"@commitlint/config-conventional": "^20.4.3",
+		"@semantic-release/changelog": "^6.0.3",
+		"@semantic-release/git": "^10.0.1",
+		"@types/bun": "^1.3.10",
+		"husky": "^9.1.7",
+		"semantic-release": "^25.0.3",
+		"zod": "^4.3.6"
+	}
 }
