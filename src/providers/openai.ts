@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { OutputError, ProviderError } from "../errors";
 import type { ProviderConfig } from "../types";
+import { parseActionFromJson } from "./parse-action";
 import type { Provider, ProviderRequest, ProviderResponse } from "./types";
 
 export class OpenAIProvider implements Provider {
@@ -41,27 +42,10 @@ export class OpenAIProvider implements Provider {
 				throw new OutputError("No content in response", "");
 			}
 
-			let parsed: unknown;
-			try {
-				parsed = JSON.parse(content);
-			} catch {
-				throw new OutputError("Failed to parse response as JSON", content);
-			}
-
-			const action = parsed as { tool?: string; params?: Record<string, unknown> };
-			if (
-				typeof action.tool !== "string" ||
-				typeof action.params !== "object" ||
-				action.params === null
-			) {
-				throw new OutputError("Response missing required 'tool' or 'params' fields", content);
-			}
+			const action = parseActionFromJson(content);
 
 			return {
-				action: {
-					tool: action.tool,
-					params: action.params as Record<string, unknown>,
-				},
+				action,
 				meta: {
 					tokensUsed: {
 						input: response.usage?.prompt_tokens ?? 0,

@@ -71,7 +71,7 @@ async function runTest(
 	try {
 		const details = await fn();
 		const duration = performance.now() - start;
-		results.push({ name, passed: true, duration, details: details ?? undefined });
+		results.push({ name, passed: true, duration, details });
 		console.log(`PASS (${(duration / 1000).toFixed(1)}s)`);
 	} catch (err) {
 		const duration = performance.now() - start;

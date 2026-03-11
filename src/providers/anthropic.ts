@@ -1,5 +1,6 @@
 import { OutputError, ProviderError } from "../errors";
 import type { ProviderConfig } from "../types";
+import { parseActionFromJson } from "./parse-action";
 import type { Provider, ProviderRequest, ProviderResponse } from "./types";
 
 const ANTHROPIC_API_BASE = "https://api.anthropic.com";
@@ -70,7 +71,7 @@ export class AnthropicProvider implements Provider {
 
 		for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
 			if (request.signal?.aborted) {
-				throw new ProviderError("anthropic", "Request was aborted");
+				throw new ProviderError(this.config.type, "Request was aborted");
 			}
 
 			try {
@@ -86,10 +87,13 @@ export class AnthropicProvider implements Provider {
 					if (RETRY_STATUS_CODES.includes(response.status) && attempt < MAX_RETRIES) {
 						const delay = BASE_DELAY_MS * 2 ** attempt;
 						await sleep(delay);
-						lastError = new ProviderError("anthropic", `HTTP ${response.status}: ${errorBody}`);
+						lastError = new ProviderError(
+							this.config.type,
+							`HTTP ${response.status}: ${errorBody}`,
+						);
 						continue;
 					}
-					throw new ProviderError("anthropic", `HTTP ${response.status}: ${errorBody}`);
+					throw new ProviderError(this.config.type, `HTTP ${response.status}: ${errorBody}`);
 				}
 
 				const data = (await response.json()) as {
@@ -106,27 +110,10 @@ export class AnthropicProvider implements Provider {
 					);
 				}
 
-				let parsed: unknown;
-				try {
-					parsed = JSON.parse(textBlock.text);
-				} catch {
-					throw new OutputError("Failed to parse Anthropic response as JSON", textBlock.text);
-				}
-
-				const action = parsed as { tool?: string; params?: Record<string, unknown> };
-				if (
-					typeof action.tool !== "string" ||
-					typeof action.params !== "object" ||
-					action.params === null
-				) {
-					throw new OutputError(
-						"Response missing required 'tool' or 'params' fields",
-						textBlock.text,
-					);
-				}
+				const action = parseActionFromJson(textBlock.text);
 
 				return {
-					action: { tool: action.tool, params: action.params as Record<string, unknown> },
+					action,
 					meta: {
 						tokensUsed: {
 							input: data.usage?.input_tokens ?? 0,
@@ -137,10 +124,10 @@ export class AnthropicProvider implements Provider {
 				};
 			} catch (err) {
 				if (err instanceof ProviderError || err instanceof OutputError) throw err;
-				throw new ProviderError("anthropic", (err as Error).message);
+				throw new ProviderError(this.config.type, (err as Error).message);
 			}
 		}
 
-		throw lastError ?? new ProviderError("anthropic", "Max retries exceeded");
+		throw lastError ?? new ProviderError(this.config.type, "Max retries exceeded");
 	}
 }

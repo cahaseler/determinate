@@ -1,13 +1,5 @@
-let _randomBytes: typeof import("node:crypto").randomBytes | null = null;
-let _http: typeof import("node:http") | null = null;
-if (typeof process !== "undefined" && (process.versions?.node || process.versions?.bun)) {
-	import("node:crypto").then((m) => {
-		_randomBytes = m.randomBytes;
-	});
-	import("node:http").then((m) => {
-		_http = m;
-	});
-}
+import { randomBytes } from "node:crypto";
+import http from "node:http";
 
 import { generatePKCE } from "./pkce";
 import type {
@@ -48,10 +40,7 @@ type JwtPayload = {
 };
 
 function createState(): string {
-	if (!_randomBytes) {
-		throw new Error("OpenAI OAuth is only available in Node.js/Bun environments");
-	}
-	return _randomBytes(16).toString("hex");
+	return randomBytes(16).toString("hex");
 }
 
 function parseAuthorizationInput(input: string): { code?: string; state?: string } {
@@ -200,12 +189,9 @@ type OAuthServerInfo = {
 };
 
 function startLocalOAuthServer(state: string): Promise<OAuthServerInfo> {
-	if (!_http) {
-		throw new Error("OpenAI OAuth is only available in Node.js/Bun environments");
-	}
 	let lastCode: string | null = null;
 	let cancelled = false;
-	const server = _http.createServer((req, res) => {
+	const server = http.createServer((req, res) => {
 		try {
 			const url = new URL(req.url || "", "http://localhost");
 			if (url.pathname !== "/auth/callback") {

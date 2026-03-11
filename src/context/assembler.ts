@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NoValidToolsError } from "../errors";
 import { generateActionSchema } from "../schema/action-schema";
-import type { HistoryEntry, TokenBudgets, ToolDefinition } from "../types";
+import type { HistoryEntry, ProviderConfig, TokenBudgets, ToolDefinition } from "../types";
 import { enforceBudgets } from "./budget";
 import type { Tokenizer } from "./tokenizer";
 
@@ -12,7 +12,7 @@ interface AssembleInput<TState> {
 	instructions: (state: TState) => string;
 	budgets: TokenBudgets;
 	tokenizer: Tokenizer;
-	providerType: string;
+	providerType: ProviderConfig["type"];
 }
 
 interface AssembledPayload {

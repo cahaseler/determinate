@@ -1,4 +1,5 @@
 import { encoding_for_model, get_encoding, type TiktokenModel } from "tiktoken";
+import type { ProviderConfig } from "../types";
 
 export interface Tokenizer {
 	count(input: string | Record<string, unknown>): number;
@@ -33,7 +34,7 @@ class CharApproximationTokenizer implements Tokenizer {
 	}
 }
 
-export function createTokenizer(providerType: string, model: string): Tokenizer {
+export function createTokenizer(providerType: ProviderConfig["type"], model: string): Tokenizer {
 	if (providerType === "openai" || providerType === "openrouter" || providerType === "vllm") {
 		return new TiktokenTokenizer(model);
 	}

@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { OAuthCredentials } from "./types";
@@ -33,7 +33,6 @@ export class TokenStore {
 
 	async clear(providerId: string): Promise<void> {
 		try {
-			const { unlink } = await import("node:fs/promises");
 			await unlink(this.path(providerId));
 		} catch {
 			// File may not exist
