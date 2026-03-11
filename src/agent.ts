@@ -3,7 +3,6 @@ import { createTokenizer, type Tokenizer } from "./context/tokenizer";
 import { AbortError, OutputError, ProviderError, ValidationError } from "./errors";
 import { getOAuthApiKey } from "./oauth/index";
 import { createProvider } from "./providers/factory";
-import { estimateCost } from "./providers/pricing";
 import type { Provider } from "./providers/types";
 import { type ValidatedHistoryEntry, validateHistory } from "./schema/history-schema";
 import type {
@@ -131,7 +130,13 @@ export class Agent<TState> {
 				response.action.params = paramsResult.data as Record<string, unknown>;
 			}
 
-			const cost = estimateCost(response.meta.model, response.meta.tokensUsed);
+			let cost: number | undefined;
+			if (this.config.pricing) {
+				const { input, output } = response.meta.tokensUsed;
+				cost =
+					(input / 1_000_000) * this.config.pricing.input +
+					(output / 1_000_000) * this.config.pricing.output;
+			}
 
 			const result: ActionResult = {
 				action: response.action,

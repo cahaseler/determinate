@@ -28,6 +28,7 @@ export type {
 	AgentConfig,
 	AssembledContext,
 	HistoryEntry,
+	ModelPricing,
 	NextActionOptions,
 	ProviderConfig,
 	TokenBudgets,

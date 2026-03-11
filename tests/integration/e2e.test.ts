@@ -110,7 +110,7 @@ describe("end-to-end with mock server", () => {
 		expect(result.meta.tokensUsed.output).toBe(25);
 		expect(result.meta.model).toBe("gpt-4o");
 		expect(result.meta.latency).toBeGreaterThan(0);
-		expect(result.meta.cost).toBeDefined();
+		expect(result.meta.cost).toBeUndefined();
 	});
 
 	it("returns verbose context when requested", async () => {

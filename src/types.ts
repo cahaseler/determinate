@@ -26,6 +26,11 @@ export interface ToolDefinition<TState> {
 	instructions?: string;
 }
 
+export interface ModelPricing {
+	input: number;
+	output: number;
+}
+
 export interface AgentConfig<TState> {
 	provider: ProviderConfig;
 	state: z.ZodType<TState>;
@@ -34,6 +39,7 @@ export interface AgentConfig<TState> {
 	context: {
 		budgets: TokenBudgets;
 	};
+	pricing?: ModelPricing;
 }
 
 // ---- History ----
