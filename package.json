@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "openai": "^6.27.0",
-    "tiktoken": "^1.0.22"
+    "tiktoken": "^1.0.22",
+    "zod-to-json-schema": "^3.25.1"
   }
 }
