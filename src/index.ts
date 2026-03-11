@@ -30,3 +30,10 @@ export {
 } from "./errors";
 
 export { Agent } from "./agent";
+
+export type {
+  OAuthCredentials,
+  OAuthLoginCallbacks,
+  OAuthProviderInterface,
+} from "./oauth/index";
+export { getOAuthProvider, getOAuthProviders, getOAuthApiKey, TokenStore } from "./oauth/index";
