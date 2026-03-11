@@ -10,7 +10,12 @@ if (typeof process !== "undefined" && (process.versions?.node || process.version
 }
 
 import { generatePKCE } from "./pkce";
-import type { OAuthCredentials, OAuthLoginCallbacks, OAuthPrompt, OAuthProviderInterface } from "./types";
+import type {
+	OAuthCredentials,
+	OAuthLoginCallbacks,
+	OAuthPrompt,
+	OAuthProviderInterface,
+} from "./types";
 
 const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 const AUTHORIZE_URL = "https://auth.openai.com/oauth/authorize";
@@ -248,7 +253,7 @@ function startLocalOAuthServer(state: string): Promise<OAuthServerInfo> {
 					},
 				});
 			})
-			.on("error", (err: NodeJS.ErrnoException) => {
+			.on("error", (_err: NodeJS.ErrnoException) => {
 				resolve({
 					close: () => {
 						try {

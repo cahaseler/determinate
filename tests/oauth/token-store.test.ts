@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { TokenStore } from "../../src/oauth/token-store";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { TokenStore } from "../../src/oauth/token-store";
 
 describe("TokenStore", () => {
 	let tempDir: string;

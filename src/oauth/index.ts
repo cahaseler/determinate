@@ -1,12 +1,19 @@
-import type { OAuthProviderInterface, OAuthCredentials, OAuthLoginCallbacks } from "./types";
 import { anthropicOAuthProvider } from "./anthropic";
 import { openaiOAuthProvider } from "./openai";
 import { TokenStore } from "./token-store";
+import type { OAuthCredentials, OAuthProviderInterface } from "./types";
 
-export type { OAuthCredentials, OAuthLoginCallbacks, OAuthProviderInterface, OAuthProviderId, OAuthPrompt, OAuthAuthInfo } from "./types";
-export { TokenStore } from "./token-store";
 export { anthropicOAuthProvider } from "./anthropic";
 export { openaiOAuthProvider } from "./openai";
+export { TokenStore } from "./token-store";
+export type {
+	OAuthAuthInfo,
+	OAuthCredentials,
+	OAuthLoginCallbacks,
+	OAuthPrompt,
+	OAuthProviderId,
+	OAuthProviderInterface,
+} from "./types";
 
 const providers = new Map<string, OAuthProviderInterface>([
 	["anthropic", anthropicOAuthProvider],

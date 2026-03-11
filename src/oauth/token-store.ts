@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join, dirname } from "node:path";
 import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import type { OAuthCredentials } from "./types";
 
 const DEFAULT_DIR = join(homedir(), ".next-action-agent");
