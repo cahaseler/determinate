@@ -4,7 +4,7 @@ A TypeScript library that treats LLMs as next-action predictors instead of conve
 
 ## The Problem
 
-Current agentic frameworks are built around a conversation metaphor: an append-only chat history, a static list of tools, and a loop that generates the next message given everything that came before. This works well for coding assistants where the environment is deterministic and stable, but falls apart in dynamic environments where:
+Current agentic frameworks are built around a conversation metaphor: an append-only chat history, a static list of tools, and a loop that generates the next message given everything that came before. This works well for coding assistants where the environment is stable, but falls apart in dynamic environments where:
 
 - **State goes stale.** If you inject environment state each turn across a 50-turn interaction, you have 50 snapshots in context, 49 of which are wrong. The oldest, most incorrect snapshot has the strongest positional signal.
 - **Context fills with noise.** Failed tool calls, redundant observations, and retry loops consume tokens without contributing to decisions. Half the conversation history in a typical agentic run is the agent's own mistakes.
