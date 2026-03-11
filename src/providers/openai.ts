@@ -41,17 +41,22 @@ export class OpenAIProvider implements Provider {
         throw new OutputError("No content in response", "");
       }
 
-      let action: { tool: string; params: Record<string, unknown> };
+      let parsed: unknown;
       try {
-        action = JSON.parse(content);
+        parsed = JSON.parse(content);
       } catch {
         throw new OutputError("Failed to parse response as JSON", content);
+      }
+
+      const action = parsed as { tool?: string; params?: Record<string, unknown> };
+      if (typeof action.tool !== "string" || typeof action.params !== "object" || action.params === null) {
+        throw new OutputError("Response missing required 'tool' or 'params' fields", content);
       }
 
       return {
         action: {
           tool: action.tool,
-          params: action.params,
+          params: action.params as Record<string, unknown>,
         },
         meta: {
           tokensUsed: {

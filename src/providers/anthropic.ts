@@ -28,17 +28,17 @@ export class AnthropicProvider implements Provider {
   }
 
   async sendRequest(request: ProviderRequest): Promise<ProviderResponse> {
-    const messages = request.messages as Array<{ role: string; content: string }>;
+    const messages = request.messages as Array<{ role: string; content: unknown }>;
     let system: string | undefined;
     const anthropicMessages: AnthropicMessage[] = [];
 
     for (const msg of messages) {
       if (msg.role === "system") {
-        system = msg.content;
+        system = msg.content as string;
       } else {
         anthropicMessages.push({
           role: msg.role as "user" | "assistant",
-          content: msg.content,
+          content: msg.content as AnthropicMessage["content"],
         });
       }
     }
@@ -69,6 +69,10 @@ export class AnthropicProvider implements Provider {
     let lastError: Error | undefined;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (request.signal?.aborted) {
+        throw new ProviderError("anthropic", "Request was aborted");
+      }
+
       try {
         const response = await fetch(`${this.baseUrl}/v1/messages`, {
           method: "POST",
@@ -95,15 +99,20 @@ export class AnthropicProvider implements Provider {
           throw new OutputError("No text content in Anthropic response", JSON.stringify(data.content));
         }
 
-        let action: { tool: string; params: Record<string, unknown> };
+        let parsed: unknown;
         try {
-          action = JSON.parse(textBlock.text);
+          parsed = JSON.parse(textBlock.text);
         } catch {
           throw new OutputError("Failed to parse Anthropic response as JSON", textBlock.text);
         }
 
+        const action = parsed as { tool?: string; params?: Record<string, unknown> };
+        if (typeof action.tool !== "string" || typeof action.params !== "object" || action.params === null) {
+          throw new OutputError("Response missing required 'tool' or 'params' fields", textBlock.text);
+        }
+
         return {
-          action: { tool: action.tool, params: action.params },
+          action: { tool: action.tool, params: action.params as Record<string, unknown> },
           meta: {
             tokensUsed: {
               input: data.usage?.input_tokens ?? 0,

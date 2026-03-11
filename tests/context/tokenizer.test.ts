@@ -30,7 +30,14 @@ describe("tokenizer", () => {
   });
 
   it("uses character approximation for unknown providers", () => {
-    const tokenizer = createTokenizer("vllm" as any, "unknown-model");
+    const tokenizer = createTokenizer("some-unknown-provider", "unknown-model");
+    const count = tokenizer.count("Hello, world!");
+    // Character approximation: ceil(13 / 3) = 5
+    expect(count).toBe(5);
+  });
+
+  it("uses tiktoken for vllm provider", () => {
+    const tokenizer = createTokenizer("vllm", "unknown-model");
     const count = tokenizer.count("Hello, world!");
     expect(count).toBeGreaterThan(0);
   });
