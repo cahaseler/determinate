@@ -1,5 +1,5 @@
 {
-  "name": "next-action-agent",
+  "name": "determinate",
   "module": "src/index.ts",
   "type": "module",
   "private": true,

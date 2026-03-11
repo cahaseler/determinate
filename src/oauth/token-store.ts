@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { OAuthCredentials } from "./types";
 
-const DEFAULT_DIR = join(homedir(), ".next-action-agent");
+const DEFAULT_DIR = join(homedir(), ".determinate");
 
 export class TokenStore {
 	private dir: string;

@@ -1,4 +1,4 @@
-# next-action-agent
+# determinate
 
 Decision engine that treats LLMs as next-action predictors with constrained structured output. Not a framework — does not own the loop. Consumer provides state, tools, rules, and history; library assembles optimized context, calls the LLM, returns a single action choice.
 
@@ -28,7 +28,7 @@ Consumer Loop
 - **Anthropic provider** is a raw fetch adapter (no SDK). Uses `output_config.format` for structured output, implements its own retry with exponential backoff.
 - **OpenAI provider** uses the official OpenAI SDK. Handles OpenAI, vLLM, and OpenRouter via `baseUrl`.
 - **Token budgeting** rejects (throws `BudgetExceededError`) if any section exceeds its budget. No silent truncation.
-- **OAuth** extracted from pi-ai (MIT). Supports Anthropic and OpenAI device code flows. Tokens stored at `~/.next-action-agent/` with 0o600 permissions.
+- **OAuth** extracted from pi-ai (MIT). Supports Anthropic and OpenAI device code flows. Tokens stored at `~/.determinate/` with 0o600 permissions.
 
 ## Project Structure
 

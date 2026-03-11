@@ -1,4 +1,4 @@
-# next-action-agent
+# determinate
 
 A TypeScript library that treats LLMs as next-action predictors instead of conversational partners.
 
@@ -17,7 +17,7 @@ For the full argument, see [Beyond the Sacred Conversation](beyond-the-sacred-co
 
 The unit of work is not a conversation turn. It is a **state-to-action decision**.
 
-`next-action-agent` is a decision engine, not a framework. It does not own the loop, manage side effects, or implement tool handlers. You provide the situation; it returns an action.
+`determinate` is a decision engine, not a framework. It does not own the loop, manage side effects, or implement tool handlers. You provide the situation; it returns an action.
 
 Each call to `nextAction()`:
 
@@ -32,14 +32,14 @@ No conversation history accumulates inside the library. Context is an intentiona
 ## Quick Start
 
 ```bash
-bun add next-action-agent
+bun add determinate
 # zod is a peer dependency
 bun add zod
 ```
 
 ```typescript
 import { z } from "zod";
-import { createAgent } from "next-action-agent";
+import { createAgent } from "determinate";
 
 const agent = createAgent({
   provider: {
@@ -209,7 +209,7 @@ All errors are typed and actionable:
 Built-in device code flows for subscription-based access (ChatGPT Plus, Claude Pro):
 
 ```typescript
-import { getOAuthProvider, getOAuthApiKey } from "next-action-agent";
+import { getOAuthProvider, getOAuthApiKey } from "determinate";
 
 // Trigger login flow
 const provider = getOAuthProvider("openai"); // returns undefined if not registered
