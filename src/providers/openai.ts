@@ -57,9 +57,23 @@ export class OpenAIProvider implements Provider {
 		} catch (err) {
 			if (err instanceof OutputError) throw err;
 			if (err instanceof OpenAI.APIError) {
-				throw new ProviderError(this.config.type, err.message);
+				const detail = serializeProviderError(err.error);
+				throw new ProviderError(
+					this.config.type,
+					detail ? `${err.message}: ${detail}` : err.message,
+				);
 			}
 			throw err;
 		}
+	}
+}
+
+function serializeProviderError(error: unknown): string | undefined {
+	if (error === undefined || error === null) return undefined;
+	if (typeof error === "string") return error;
+	try {
+		return JSON.stringify(error);
+	} catch {
+		return String(error);
 	}
 }

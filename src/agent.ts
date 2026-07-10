@@ -96,6 +96,7 @@ export class Agent<TState> {
 				budgets: this.config.context.budgets,
 				tokenizer: this.tokenizer,
 				providerType: this.config.provider.type,
+				providerModel: this.config.provider.model,
 			});
 
 			const provider = await this.resolveProvider();
@@ -124,7 +125,10 @@ export class Agent<TState> {
 
 					const toolDef = this.config.tools.find((t) => t.name === response?.action.tool);
 					if (toolDef) {
-						const paramsResult = toolDef.params.safeParse(response.action.params);
+						let paramsResult = toolDef.params.safeParse(response.action.params);
+						if (!paramsResult.success) {
+							paramsResult = toolDef.params.safeParse(omitNullObjectFields(response.action.params));
+						}
 						if (!paramsResult.success) {
 							throw new OutputError(
 								`Params for tool "${response.action.tool}" failed validation: ${paramsResult.error.issues.map((i) => i.message).join(", ")}`,
@@ -188,4 +192,14 @@ export class Agent<TState> {
 			throw err;
 		}
 	}
+}
+
+function omitNullObjectFields(value: unknown): unknown {
+	if (Array.isArray(value)) return value.map(omitNullObjectFields);
+	if (!value || typeof value !== "object") return value;
+	return Object.fromEntries(
+		Object.entries(value as Record<string, unknown>)
+			.filter(([, child]) => child !== null)
+			.map(([key, child]) => [key, omitNullObjectFields(child)]),
+	);
 }
