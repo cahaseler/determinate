@@ -2,16 +2,14 @@ import { describe, expect, it } from "bun:test";
 import { z } from "zod";
 import { generateActionSchema } from "../../src/schema/action-schema";
 
-interface SchemaProperties {
-	tool?: { enum?: string[] };
-	params?: {
-		anyOf?: Array<{
-			properties: Record<string, { type?: string; enum?: string[] }>;
-			required?: string[];
-			additionalProperties?: boolean;
-		}>;
-		properties?: Record<string, unknown>;
+interface ActionBranch {
+	type: string;
+	properties: {
+		tool: { type: string; enum: string[] };
+		params: { properties?: Record<string, unknown>; required?: string[] };
 	};
+	required: string[];
+	additionalProperties: boolean;
 }
 
 describe("action schema generation", () => {
@@ -28,82 +26,53 @@ describe("action schema generation", () => {
 		},
 	];
 
-	it("generates a valid JSON schema object", () => {
-		const schema = generateActionSchema(tools);
-		expect(schema.type).toBe("object");
-		expect(schema.properties).toBeDefined();
+	it("generates one top-level action branch per tool", () => {
+		const schema = generateActionSchema(tools) as { anyOf: ActionBranch[] };
+		expect(schema.anyOf).toHaveLength(2);
+		expect(schema.anyOf.map((branch) => branch.properties.tool.enum[0])).toEqual([
+			"approve_order",
+			"reject_order",
+		]);
 	});
 
-	it("includes tool as a property with enum of tool names", () => {
-		const schema = generateActionSchema(tools);
-		const props = schema.properties as SchemaProperties;
-		expect(props.tool?.enum).toContain("approve_order");
-		expect(props.tool?.enum).toContain("reject_order");
-		expect(props.tool?.enum).toHaveLength(2);
+	it("couples each tool discriminator to only its own parameter schema", () => {
+		const schema = generateActionSchema(tools) as { anyOf: ActionBranch[] };
+		const approve = schema.anyOf.find(
+			(branch) => branch.properties.tool.enum[0] === "approve_order",
+		);
+		const reject = schema.anyOf.find((branch) => branch.properties.tool.enum[0] === "reject_order");
+
+		expect(approve?.properties.params.properties).toHaveProperty("note");
+		expect(approve?.properties.params.properties).not.toHaveProperty("reason");
+		expect(reject?.properties.params.properties).toHaveProperty("reason");
+		expect(reject?.properties.params.properties).not.toHaveProperty("note");
 	});
 
-	it("includes params with anyOf branches for multiple tools", () => {
-		const schema = generateActionSchema(tools);
-		const props = schema.properties as SchemaProperties;
-		expect(props.params?.anyOf).toBeDefined();
-		expect(props.params?.anyOf).toHaveLength(2);
-	});
-
-	it("each anyOf branch includes a tool_name enum discriminant", () => {
-		const schema = generateActionSchema(tools);
-		const props = schema.properties as SchemaProperties;
-		const branches = props.params?.anyOf ?? [];
-		expect(branches).toHaveLength(2);
-		for (const branch of branches) {
-			expect(branch.properties.tool_name.type).toBe("string");
-			expect(branch.properties.tool_name.enum).toBeDefined();
-			expect(branch.properties.tool_name.enum).toHaveLength(1);
-		}
-		const toolNames = branches.map((b) => b.properties.tool_name.enum?.[0]);
-		expect(toolNames).toContain("approve_order");
-		expect(toolNames).toContain("reject_order");
-	});
-
-	it("sets additionalProperties to false on root and branches", () => {
-		const schema = generateActionSchema(tools);
-		expect(schema.additionalProperties).toBe(false);
-		const props = schema.properties as SchemaProperties;
-		const branches = props.params?.anyOf ?? [];
-		expect(branches).toHaveLength(2);
-		for (const branch of branches) {
+	it("makes every branch strict and requires tool and params", () => {
+		const schema = generateActionSchema(tools) as { anyOf: ActionBranch[] };
+		for (const branch of schema.anyOf) {
+			expect(branch.type).toBe("object");
 			expect(branch.additionalProperties).toBe(false);
+			expect(branch.required).toEqual(["tool", "params"]);
 		}
 	});
 
-	it("marks tool and params as required", () => {
-		const schema = generateActionSchema(tools);
-		expect(schema.required).toContain("tool");
-		expect(schema.required).toContain("params");
+	it("preserves required parameter fields inside each branch", () => {
+		const schema = generateActionSchema(tools) as { anyOf: ActionBranch[] };
+		expect(schema.anyOf[0].properties.params.required).toContain("note");
+		expect(schema.anyOf[1].properties.params.required).toContain("reason");
 	});
 
-	it("handles single tool without anyOf wrapper", () => {
-		const schema = generateActionSchema([tools[0]]);
-		const props = schema.properties as SchemaProperties;
-		expect(props.tool?.enum).toEqual(["approve_order"]);
-		const params = props.params as { anyOf?: unknown; properties?: Record<string, unknown> };
-		expect(params.anyOf).toBeUndefined();
-		expect(params.properties).toBeDefined();
+	it("uses a direct object schema for a single tool", () => {
+		const schema = generateActionSchema([tools[0]]) as unknown as ActionBranch & {
+			anyOf?: unknown;
+		};
+		expect(schema.anyOf).toBeUndefined();
+		expect(schema.properties.tool.enum).toEqual(["approve_order"]);
+		expect(schema.properties.params.properties).toHaveProperty("note");
 	});
 
-	it("throws on empty tools array", () => {
+	it("throws on an empty tool list", () => {
 		expect(() => generateActionSchema([])).toThrow();
-	});
-
-	it("all branch properties are listed in required", () => {
-		const schema = generateActionSchema(tools);
-		const props = schema.properties as SchemaProperties;
-		const branches = props.params?.anyOf ?? [];
-		expect(branches.length).toBeGreaterThan(0);
-		for (const branch of branches) {
-			const propNames = Object.keys(branch.properties);
-			for (const name of propNames) {
-				expect(branch.required).toContain(name);
-			}
-		}
 	});
 });
