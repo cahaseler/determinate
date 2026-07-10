@@ -31,5 +31,9 @@ export function generateActionSchema(tools: ToolForSchema[]): Record<string, unk
 		};
 	});
 
-	return actionBranches.length === 1 ? actionBranches[0]! : { anyOf: actionBranches };
+	const firstBranch = actionBranches[0];
+	if (!firstBranch) {
+		throw new Error("Cannot generate action schema with zero tools");
+	}
+	return actionBranches.length === 1 ? firstBranch : { anyOf: actionBranches };
 }

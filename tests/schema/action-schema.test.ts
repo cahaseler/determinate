@@ -37,7 +37,9 @@ describe("action schema generation", () => {
 
 	it("couples each tool discriminator to only its own parameter schema", () => {
 		const schema = generateActionSchema(tools) as { anyOf: ActionBranch[] };
-		const approve = schema.anyOf.find((branch) => branch.properties.tool.enum[0] === "approve_order");
+		const approve = schema.anyOf.find(
+			(branch) => branch.properties.tool.enum[0] === "approve_order",
+		);
 		const reject = schema.anyOf.find((branch) => branch.properties.tool.enum[0] === "reject_order");
 
 		expect(approve?.properties.params.properties).toHaveProperty("note");
@@ -62,7 +64,9 @@ describe("action schema generation", () => {
 	});
 
 	it("uses a direct object schema for a single tool", () => {
-		const schema = generateActionSchema([tools[0]]) as unknown as ActionBranch & { anyOf?: unknown };
+		const schema = generateActionSchema([tools[0]]) as unknown as ActionBranch & {
+			anyOf?: unknown;
+		};
 		expect(schema.anyOf).toBeUndefined();
 		expect(schema.properties.tool.enum).toEqual(["approve_order"]);
 		expect(schema.properties.params.properties).toHaveProperty("note");
