@@ -4,7 +4,10 @@ import { parseActionFromJson } from "../../src/providers/parse-action";
 
 describe("action response parsing", () => {
 	it("parses ordinary JSON actions", () => {
-		expect(parseActionFromJson('{"tool":"dock","params":{}}')).toEqual({ tool: "dock", params: {} });
+		expect(parseActionFromJson('{"tool":"dock","params":{}}')).toEqual({
+			tool: "dock",
+			params: {},
+		});
 	});
 
 	it("normalizes a DeepSeek DSML tool call", () => {
@@ -30,8 +33,7 @@ describe("action response parsing", () => {
 	});
 
 	it("rejects malformed or multiple DSML calls", () => {
-		expect(() => parseActionFromJson("<｜DSML｜invoke name=bad>"))
-			.toThrow(OutputError);
+		expect(() => parseActionFromJson("<｜DSML｜invoke name=bad>")).toThrow(OutputError);
 		const call = '<｜DSML｜invoke name="dock"></｜DSML｜invoke>';
 		expect(() => parseActionFromJson(`${call}${call}`)).toThrow(OutputError);
 	});

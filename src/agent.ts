@@ -145,7 +145,8 @@ export class Agent<TState> {
 				}
 			}
 
-			if (!response || outputError) throw outputError ?? new OutputError("Model returned no response", "");
+			if (!response || outputError)
+				throw outputError ?? new OutputError("Model returned no response", "");
 			const latency = performance.now() - start;
 
 			let cost: number | undefined;

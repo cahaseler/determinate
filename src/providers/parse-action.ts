@@ -33,7 +33,8 @@ function parseDeepSeekToolCall(raw: string): Action | null {
 	if (!tool || body === undefined) return null;
 
 	const params: Record<string, unknown> = {};
-	const parameterPattern = /<｜DSML｜parameter\s+name="([^"]+)"(?:\s+string="(true|false)")?>([\s\S]*?)<\/｜DSML｜parameter>/g;
+	const parameterPattern =
+		/<｜DSML｜parameter\s+name="([^"]+)"(?:\s+string="(true|false)")?>([\s\S]*?)<\/｜DSML｜parameter>/g;
 	for (const match of body.matchAll(parameterPattern)) {
 		const name = match[1];
 		const stringValue = match[2];

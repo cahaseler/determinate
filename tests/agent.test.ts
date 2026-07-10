@@ -114,10 +114,16 @@ describe("agent", () => {
 				meta: { tokensUsed: { input: 1, output: 1 }, model: "test" },
 			},
 		];
-		(agent as unknown as { provider: { sendRequest: (request: { messages: unknown[] }) => Promise<unknown> } }).provider = {
+		(
+			agent as unknown as {
+				provider: { sendRequest: (request: { messages: unknown[] }) => Promise<unknown> };
+			}
+		).provider = {
 			sendRequest: async (request) => {
 				requests.push({ messages: [...request.messages] });
-				return responses.shift()!;
+				const response = responses.shift();
+				if (!response) throw new Error("Missing mock provider response");
+				return response;
 			},
 		};
 
