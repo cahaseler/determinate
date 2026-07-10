@@ -17,34 +17,19 @@ export function generateActionSchema(tools: ToolForSchema[]): Record<string, unk
 		throw new Error("Cannot generate action schema with zero tools");
 	}
 
-	const toolNames = tools.map((t) => t.name);
-
-	const paramBranches = tools.map((tool) => {
+	const actionBranches = tools.map((tool) => {
 		const baseSchema = z.toJSONSchema(tool.params) as JsonSchemaObject;
 
 		return {
 			type: "object",
 			properties: {
-				tool_name: { type: "string", enum: [tool.name] },
-				...(baseSchema.properties ?? {}),
+				tool: { type: "string", enum: [tool.name] },
+				params: baseSchema,
 			},
-			required: ["tool_name", ...(baseSchema.required ?? [])],
+			required: ["tool", "params"],
 			additionalProperties: false,
 		};
 	});
 
-	const paramsProperty = paramBranches.length === 1 ? paramBranches[0] : { anyOf: paramBranches };
-
-	return {
-		type: "object",
-		properties: {
-			tool: {
-				type: "string",
-				enum: toolNames,
-			},
-			params: paramsProperty,
-		},
-		required: ["tool", "params"],
-		additionalProperties: false,
-	};
+	return actionBranches.length === 1 ? actionBranches[0]! : { anyOf: actionBranches };
 }
