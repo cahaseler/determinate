@@ -100,33 +100,54 @@ export class Agent<TState> {
 
 			const provider = await this.resolveProvider();
 			const start = performance.now();
-			const response = await provider.sendRequest({
-				messages: assembled.messages,
-				outputSchema: assembled.outputSchema,
-				model: this.config.provider.model,
-				options: this.config.provider.options,
-				signal,
-			});
-			const latency = performance.now() - start;
+			const retryMessages = [...assembled.messages];
+			const outputRetries = options?.outputRetries ?? 2;
+			let response: Awaited<ReturnType<Provider["sendRequest"]>> | undefined;
+			let outputError: OutputError | undefined;
 
-			if (!assembled.validTools.includes(response.action.tool)) {
-				throw new OutputError(
-					`Model returned tool "${response.action.tool}" which is not in the valid set: [${assembled.validTools.join(", ")}]`,
-					JSON.stringify(response.action),
-				);
-			}
+			for (let attempt = 0; attempt <= outputRetries; attempt++) {
+				try {
+					response = await provider.sendRequest({
+						messages: retryMessages,
+						outputSchema: assembled.outputSchema,
+						model: this.config.provider.model,
+						options: this.config.provider.options,
+						signal,
+					});
 
-			const toolDef = this.config.tools.find((t) => t.name === response.action.tool);
-			if (toolDef) {
-				const paramsResult = toolDef.params.safeParse(response.action.params);
-				if (!paramsResult.success) {
-					throw new OutputError(
-						`Params for tool "${response.action.tool}" failed validation: ${paramsResult.error.issues.map((i) => i.message).join(", ")}`,
-						JSON.stringify(response.action),
-					);
+					if (!assembled.validTools.includes(response.action.tool)) {
+						throw new OutputError(
+							`Model returned tool "${response.action.tool}" which is not in the valid set: [${assembled.validTools.join(", ")}]`,
+							JSON.stringify(response.action),
+						);
+					}
+
+					const toolDef = this.config.tools.find((t) => t.name === response?.action.tool);
+					if (toolDef) {
+						const paramsResult = toolDef.params.safeParse(response.action.params);
+						if (!paramsResult.success) {
+							throw new OutputError(
+								`Params for tool "${response.action.tool}" failed validation: ${paramsResult.error.issues.map((i) => i.message).join(", ")}`,
+								JSON.stringify(response.action),
+							);
+						}
+						response.action.params = paramsResult.data as Record<string, unknown>;
+					}
+					outputError = undefined;
+					break;
+				} catch (err) {
+					if (!(err instanceof OutputError) || attempt === outputRetries) throw err;
+					outputError = err;
+					retryMessages.push({
+						role: "user",
+						content: `Your previous response was invalid: ${err.message}. Respond only with one JSON object that exactly matches the supplied schema.`,
+					});
 				}
-				response.action.params = paramsResult.data as Record<string, unknown>;
 			}
+
+			if (!response || outputError)
+				throw outputError ?? new OutputError("Model returned no response", "");
+			const latency = performance.now() - start;
 
 			let cost: number | undefined;
 			if (this.config.pricing) {
