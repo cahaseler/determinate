@@ -51,9 +51,7 @@ export function generateActionSchema(
 	if (options.strictRootObject && actionBranches.length > 1) {
 		return generateStrictRootSchema(actionBranches);
 	}
-	return actionBranches.length === 1
-		? firstBranch
-		: { anyOf: actionBranches };
+	return actionBranches.length === 1 ? firstBranch : { anyOf: actionBranches };
 }
 
 function stripDynamicObjectSchemas(value: unknown): unknown {
@@ -64,11 +62,7 @@ function stripDynamicObjectSchemas(value: unknown): unknown {
 			.filter(([key]) => key !== "propertyNames")
 			.map(([key, child]) => [key, stripDynamicObjectSchemas(child)]),
 	) as JsonSchemaObject;
-	if (
-		schema.type === "object"
-		&& !schema.properties
-		&& schema.additionalProperties !== false
-	) {
+	if (schema.type === "object" && !schema.properties && schema.additionalProperties !== false) {
 		schema.properties = {};
 		schema.required = [];
 		schema.additionalProperties = false;
@@ -81,18 +75,19 @@ function stripNumericConstraints(value: unknown): unknown {
 	if (!value || typeof value !== "object") return value;
 	return Object.fromEntries(
 		Object.entries(value as Record<string, unknown>)
-			.filter(([key]) => ![
-				"exclusiveMinimum",
-				"exclusiveMaximum",
-				"minimum",
-				"maximum",
-				"multipleOf",
-			].includes(key))
+			.filter(
+				([key]) =>
+					!["exclusiveMinimum", "exclusiveMaximum", "minimum", "maximum", "multipleOf"].includes(
+						key,
+					),
+			)
 			.map(([key, child]) => [key, stripNumericConstraints(child)]),
 	);
 }
 
-function generateStrictRootSchema(actionBranches: Array<Record<string, unknown>>): Record<string, unknown> {
+function generateStrictRootSchema(
+	actionBranches: Array<Record<string, unknown>>,
+): Record<string, unknown> {
 	const toolNames: string[] = [];
 	const variants = new Map<string, unknown[]>();
 	for (const branch of actionBranches) {

@@ -137,10 +137,12 @@ describe("agent", () => {
 	it("converts strict-provider null placeholders back to omitted optional params", async () => {
 		const agent = createAgent({
 			...baseConfig,
-			tools: [{
-				...baseConfig.tools[0],
-				params: z.object({ note: z.string(), thoughts: z.string().optional() }),
-			}],
+			tools: [
+				{
+					...baseConfig.tools[0],
+					params: z.object({ note: z.string(), thoughts: z.string().optional() }),
+				},
+			],
 		});
 		agent.setState({ status: "pending", score: 0.5 });
 		(

@@ -64,14 +64,16 @@ describe("action schema generation", () => {
 	});
 
 	it("makes optional parameters required but nullable for strict providers", () => {
-		const schema = generateActionSchema([{
-			name: "travel",
-			description: "Travel",
-			params: z.object({
-				destination: z.string(),
-				thoughts: z.string().optional(),
-			}),
-		}]) as unknown as ActionBranch;
+		const schema = generateActionSchema([
+			{
+				name: "travel",
+				description: "Travel",
+				params: z.object({
+					destination: z.string(),
+					thoughts: z.string().optional(),
+				}),
+			},
+		]) as unknown as ActionBranch;
 		const params = schema.properties.params;
 		expect(params.required).toEqual(["destination", "thoughts"]);
 		expect(params.properties?.thoughts).toEqual({
@@ -80,16 +82,15 @@ describe("action schema generation", () => {
 	});
 
 	it("includes null in optional enum values", () => {
-		const schema = generateActionSchema([{
-			name: "transfer",
-			description: "Transfer",
-			params: z.object({ target: z.enum(["self", "faction"]).optional() }),
-		}]) as unknown as ActionBranch;
+		const schema = generateActionSchema([
+			{
+				name: "transfer",
+				description: "Transfer",
+				params: z.object({ target: z.enum(["self", "faction"]).optional() }),
+			},
+		]) as unknown as ActionBranch;
 		expect(schema.properties.params.properties?.target).toEqual({
-			anyOf: [
-				{ type: "string", enum: ["self", "faction"] },
-				{ type: "null" },
-			],
+			anyOf: [{ type: "string", enum: ["self", "faction"] }, { type: "null" }],
 		});
 	});
 
@@ -121,11 +122,16 @@ describe("action schema generation", () => {
 	});
 
 	it("strips unsupported numeric constraints for limited providers", () => {
-		const schema = generateActionSchema([{
-			name: "buy",
-			description: "Buy",
-			params: z.object({ quantity: z.number().positive().max(10) }),
-		}], { limitedNumericKeywords: true }) as unknown as ActionBranch;
+		const schema = generateActionSchema(
+			[
+				{
+					name: "buy",
+					description: "Buy",
+					params: z.object({ quantity: z.number().positive().max(10) }),
+				},
+			],
+			{ limitedNumericKeywords: true },
+		) as unknown as ActionBranch;
 		const quantity = schema.properties.params.properties?.quantity as Record<string, unknown>;
 		expect(quantity.exclusiveMinimum).toBeUndefined();
 		expect(quantity.maximum).toBeUndefined();
@@ -133,11 +139,17 @@ describe("action schema generation", () => {
 	});
 
 	it("removes dynamic map keywords from OpenAI strict schemas", () => {
-		const schema = generateActionSchema([{
-			name: "bulk",
-			description: "Bulk",
-			params: z.object({ jobs: z.array(z.record(z.string(), z.unknown())).optional() }),
-		}, tools[0]], { strictRootObject: true }) as {
+		const schema = generateActionSchema(
+			[
+				{
+					name: "bulk",
+					description: "Bulk",
+					params: z.object({ jobs: z.array(z.record(z.string(), z.unknown())).optional() }),
+				},
+				tools[0],
+			],
+			{ strictRootObject: true },
+		) as {
 			properties: { params: { properties: Record<string, unknown> } };
 		};
 		const serialized = JSON.stringify(schema);
