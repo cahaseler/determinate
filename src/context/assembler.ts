@@ -13,6 +13,7 @@ interface AssembleInput<TState> {
 	budgets: TokenBudgets;
 	tokenizer: Tokenizer;
 	providerType: ProviderConfig["type"];
+	providerModel?: string;
 }
 
 interface AssembledPayload {
@@ -22,7 +23,7 @@ interface AssembledPayload {
 }
 
 export function assembleContext<TState>(input: AssembleInput<TState>): AssembledPayload {
-	const { state, tools, history, instructions, budgets, tokenizer, providerType } = input;
+	const { state, tools, history, instructions, budgets, tokenizer, providerType, providerModel } = input;
 
 	// 1. Filter tools by validWhen
 	const validTools = tools.filter((t) => t.validWhen(state));
@@ -31,7 +32,12 @@ export function assembleContext<TState>(input: AssembleInput<TState>): Assembled
 	}
 
 	// 2. Generate output schema
-	const outputSchema = generateActionSchema(validTools);
+	const outputSchema = generateActionSchema(validTools, {
+		strictRootObject: providerType === "openai"
+			|| (providerType === "openrouter" && providerModel?.startsWith("openai/")),
+		limitedNumericKeywords: providerType === "anthropic"
+			|| (providerType === "openrouter" && providerModel?.startsWith("anthropic/")),
+	});
 
 	// 3. Build instructions text
 	const instructionsText = instructions(state);

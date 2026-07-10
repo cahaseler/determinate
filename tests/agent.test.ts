@@ -133,4 +133,28 @@ describe("agent", () => {
 		expect(requests).toHaveLength(2);
 		expect(requests[1].messages).toHaveLength(requests[0].messages.length + 1);
 	});
+
+	it("converts strict-provider null placeholders back to omitted optional params", async () => {
+		const agent = createAgent({
+			...baseConfig,
+			tools: [{
+				...baseConfig.tools[0],
+				params: z.object({ note: z.string(), thoughts: z.string().optional() }),
+			}],
+		});
+		agent.setState({ status: "pending", score: 0.5 });
+		(
+			agent as unknown as {
+				provider: { sendRequest: () => Promise<unknown> };
+			}
+		).provider = {
+			sendRequest: async () => ({
+				action: { tool: "approve", params: { note: "ok", thoughts: null } },
+				meta: { tokensUsed: { input: 1, output: 1 }, model: "test" },
+			}),
+		};
+
+		const result = await agent.nextAction();
+		expect(result.action.params).toEqual({ note: "ok" });
+	});
 });

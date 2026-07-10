@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { OpenAIProvider } from "../../src/providers/openai";
+import { ProviderError } from "../../src/errors";
 
 describe("OpenAI provider", () => {
 	let server: ReturnType<typeof Bun.serve>;
@@ -105,5 +106,38 @@ describe("OpenAI provider", () => {
 
 		expect(result.action).toHaveProperty("tool");
 		expect(result.action).toHaveProperty("params");
+	});
+
+	it("preserves structured provider error details", async () => {
+		const failingServer = Bun.serve({
+			port: 0,
+			fetch() {
+				return Response.json({
+					error: {
+						message: "Provider returned error",
+						metadata: { raw: "Root schema must be an object" },
+					},
+				}, { status: 400 });
+			},
+		});
+		try {
+			const provider = new OpenAIProvider({
+				type: "openai",
+				model: "gpt-4o",
+				apiKey: "test-key",
+				baseUrl: `http://localhost:${failingServer.port}/v1`,
+			});
+
+			await expect(provider.sendRequest({
+				messages: [{ role: "user", content: "test" }],
+				outputSchema: { anyOf: [] },
+				model: "gpt-4o",
+			})).rejects.toEqual(expect.objectContaining({
+				name: "ProviderError",
+				message: expect.stringContaining("Root schema must be an object"),
+			}) as ProviderError);
+		} finally {
+			failingServer.stop();
+		}
 	});
 });
