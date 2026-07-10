@@ -91,4 +91,6 @@ export interface NextActionOptions {
 	verbose?: boolean;
 	signal?: AbortSignal;
 	timeout?: number;
+	/** Number of times to ask the model again after malformed or schema-invalid output. Defaults to 2. */
+	outputRetries?: number;
 }

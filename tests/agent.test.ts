@@ -99,4 +99,32 @@ describe("agent", () => {
 		const agent = createAgent(baseConfig);
 		await expect(agent.nextAction()).rejects.toThrow();
 	});
+
+	it("retries schema-invalid model output by default", async () => {
+		const agent = createAgent(baseConfig);
+		agent.setState({ status: "pending", score: 0.5 });
+		const requests: Array<{ messages: unknown[] }> = [];
+		const responses = [
+			{
+				action: { tool: "approve", params: { wrong: true } },
+				meta: { tokensUsed: { input: 1, output: 1 }, model: "test" },
+			},
+			{
+				action: { tool: "approve", params: { note: "fixed" } },
+				meta: { tokensUsed: { input: 1, output: 1 }, model: "test" },
+			},
+		];
+		(agent as unknown as { provider: { sendRequest: (request: { messages: unknown[] }) => Promise<unknown> } }).provider = {
+			sendRequest: async (request) => {
+				requests.push({ messages: [...request.messages] });
+				return responses.shift()!;
+			},
+		};
+
+		const result = await agent.nextAction();
+
+		expect(result.action).toEqual({ tool: "approve", params: { note: "fixed" } });
+		expect(requests).toHaveLength(2);
+		expect(requests[1].messages).toHaveLength(requests[0].messages.length + 1);
+	});
 });
