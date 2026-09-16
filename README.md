@@ -78,7 +78,7 @@ const agent = createAgent({
     `You are an order processing agent. Evaluate order risk and take appropriate action.
      Current risk score: ${s.order.riskScore}`,
   context: {
-    budgets: { instructions: 5000, state: 5000, history: 10000, tools: 3000 },
+    budgets: { instructions: 5000, history: 10000, tools: 3000 },
   },
 });
 
@@ -98,7 +98,9 @@ const result = await agent.nextAction();
 
 ### State
 
-Define your environment state as a Zod schema. The library validates it, serializes it for the model, and passes it to your tool predicates and instruction function. You replace it entirely each turn via `setState()` — no stale snapshots accumulating.
+Define your environment state as a Zod schema. The library validates it and passes it to your tool predicates and instruction function. You replace it entirely each turn via `setState()` — no stale snapshots accumulating.
+
+**State is never sent to the model.** It reaches the LLM only through whatever your `instructions(state)` function chooses to say about it, so you decide exactly what the model sees. That is why `TokenBudgets` has no `state` section.
 
 ### Tools with Conditional Validity
 
@@ -106,7 +108,7 @@ Each tool has a `validWhen` predicate evaluated against current state. Only vali
 
 ### Token Budgets
 
-You set explicit token budgets per section (instructions, state, history, tools). If any section exceeds its budget, the call is rejected with a `BudgetExceededError` — no silent truncation. This makes context overflow a build-time problem you fix once, not a runtime surprise.
+You set explicit token budgets per section (instructions, history, tools). If any section exceeds its budget, the call is rejected with a `BudgetExceededError` — no silent truncation. This makes context overflow a build-time problem you fix once, not a runtime surprise.
 
 ### History
 
@@ -155,6 +157,15 @@ provider: { type: "anthropic", model: "claude-haiku-4-5-20251001", apiKey: proce
 provider: { type: "openrouter", model: "anthropic/claude-sonnet-4-5", apiKey: process.env.OPENROUTER_API_KEY }
 ```
 
+### Schema Portability
+
+The same Zod tool definitions produce JSON Schema that one provider accepts and another rejects, so the generated schema is adapted per provider:
+
+- **OpenAI** (and `openai/*` models on OpenRouter) forbids root-level unions and optional object properties, so it receives a single strict root object with optional params expressed as nullable.
+- **Anthropic** (and `anthropic/*` on OpenRouter) rejects several numeric keywords (`minimum`, `maximum`, `multipleOf`, and the exclusive forms), so those are stripped.
+
+This relaxation applies only to what the model is asked to generate. The action it returns is still validated against your original, unrelaxed Zod schema, and null placeholders for optional fields are removed before that check.
+
 ## Cost Tracking
 
 The library returns token counts in `meta.tokensUsed` (may be `{ input: 0, output: 0 }` if the provider doesn't report usage). For cost estimation, pass your own pricing:
@@ -180,6 +191,15 @@ const controller = new AbortController();
 const result = await agent.nextAction({ signal: controller.signal });
 ```
 
+## Output Retries
+
+Constrained decoding is not perfect in practice — some models intermittently emit their native tool-call format or params that fail schema validation. When that happens, the model is re-asked with a correction message appended, up to `outputRetries` times (default 2) before an `OutputError` is thrown. DeepSeek's native DSML tool-call envelope is additionally recovered and parsed rather than counted as a failure.
+
+```typescript
+// Fail fast instead of re-asking
+const result = await agent.nextAction({ outputRetries: 0 });
+```
+
 ## Verbose Mode
 
 For debugging, get the full assembled context:
@@ -201,7 +221,7 @@ All errors are typed and actionable:
 | `BudgetExceededError` | A section exceeds its token budget |
 | `NoValidToolsError` | No tool's `validWhen` returned true |
 | `ProviderError` | Auth failure, rate limit, network error |
-| `OutputError` | Model returned invalid action (shouldn't happen with constrained output) |
+| `OutputError` | Model returned an unparseable or invalid action, and every retry was exhausted |
 | `AbortError` | Call cancelled or timed out |
 
 ## OAuth
@@ -225,7 +245,7 @@ const agent = createAgent({
 
 ## Requirements
 
-- **Runtime:** Bun (or Node.js with compatible APIs)
+- **Runtime:** Bun, or Node.js >= 22 (the openai SDK v7 floor)
 - **TypeScript:** 5.x
 - **Zod:** >= 4.0.0 (peer dependency)
 

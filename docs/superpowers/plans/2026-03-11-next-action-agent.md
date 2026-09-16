@@ -1,5 +1,12 @@
 # Next Action Agent Implementation Plan
 
+> **Status: completed and superseded (historical record).** This plan drove the
+> initial March 2026 build. Its unchecked boxes are not outstanding work, and its
+> file layout predates several changes — `zod-to-json-schema` was replaced by Zod
+> v4's native `z.toJSONSchema()`, the built-in `providers/pricing.ts` table was
+> dropped in favour of consumer-supplied pricing, and the OAuth files were
+> reorganized. Read `CLAUDE.md` for the current architecture.
+
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a TypeScript decision engine library that assembles optimized LLM context from state, tools, rules, and history, calls the LLM with constrained structured output, and returns a single action choice.
