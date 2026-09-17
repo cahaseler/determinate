@@ -116,6 +116,8 @@ export interface DeciderMeta {
 	toolProbabilities?: Record<string, number>;
 	/** Why the LLM was asked for something the decider could have settled. */
 	fallbackReason?: DeciderFallbackReason;
+	/** The decider's own failure message when it was unavailable or returned invalid output, e.g. "HTTP 429: ...". */
+	fallbackDetail?: string;
 }
 
 export interface ActionMeta {

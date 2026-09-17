@@ -277,6 +277,7 @@ describe("agent with a decider", () => {
 		expect(result.meta.decider).toMatchObject({
 			decided: "none",
 			fallbackReason: "unavailable",
+			fallbackDetail: "HTTP 529: overloaded",
 			tokensUsed: { input: 0, output: 0 },
 		});
 	});
