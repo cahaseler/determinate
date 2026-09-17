@@ -10,15 +10,23 @@ function serialize(input: string | Record<string, unknown>): string {
 	return JSON.stringify(input);
 }
 
+function loadEncoder(model: string) {
+	try {
+		return encoding_for_model(model as TiktokenModel);
+	} catch {
+		return get_encoding("cl100k_base");
+	}
+}
+
+// Building an encoder parses its whole BPE table (hundreds of ms), so agents for the same model share one.
+const encoders = new Map<string, ReturnType<typeof loadEncoder>>();
+
 class TiktokenTokenizer implements Tokenizer {
 	private encoder;
 
 	constructor(model: string) {
-		try {
-			this.encoder = encoding_for_model(model as TiktokenModel);
-		} catch {
-			this.encoder = get_encoding("cl100k_base");
-		}
+		this.encoder = encoders.get(model) ?? loadEncoder(model);
+		encoders.set(model, this.encoder);
 	}
 
 	count(input: string | Record<string, unknown>): number {
