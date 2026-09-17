@@ -14,6 +14,9 @@ Consumer Loop
         ├─ Normalize the schema for the target provider's strictness rules
         ├─ Assemble context (instructions, history, tool descriptions)
         ├─ Enforce per-section token budgets
+        ├─ If a decider is configured: one Jev request picks the tool and fills closed-set
+        │    params. A complete action returns here; a tool-only answer narrows the steps
+        │    below to that tool; low confidence or an unavailable decider changes nothing
         ├─ Translate to provider format (OpenAI or Anthropic)
         ├─ Single LLM call with constrained structured output
         ├─ Validate tool against the valid set and params against the tool's Zod schema
@@ -33,6 +36,7 @@ Consumer Loop
 - **Anthropic provider** is a raw fetch adapter (no SDK). Uses `output_config.format` for structured output, implements its own retry with exponential backoff.
 - **OpenAI provider** uses the official OpenAI SDK. Handles OpenAI, vLLM, and OpenRouter via `baseUrl`.
 - **State is not sent to the model** — state is only passed to `instructions(state)` and `validWhen(state)`. The consumer controls what the model sees through the instructions function.
+- **The decider (TypeSafe Jev) sits beside the provider, not in place of it.** Jev only chooses among declared options (Choice questions, max 255 options) and cannot produce strings or numbers, so `AgentConfig.decider` is optional and `provider` stays mandatory. `decider/closed-params.ts` decides per tool whether every param is closed-set (enum, literal, boolean, nullable/optional of those) by inspecting `z.toJSONSchema(params, { io: "input" })`. One request carries the tool question plus param questions for every closed-set tool, because Jev answers questions in parallel and cannot condition one on another. Optional params get an extra `(unset)` option. Decider answers go through the same per-tool Zod validation as LLM output. Transient decider failures fall back to the LLM; 4xx rejections throw, so a bad key is not masked by a working LLM.
 - **Token budgeting** rejects (throws `BudgetExceededError`) if any section (instructions, history, tools) exceeds its budget. No silent truncation.
 - **OAuth** extracted from pi-ai (MIT). Supports Anthropic and OpenAI device code flows. Tokens stored at `~/.determinate/` with 0o600 permissions.
 - **Node.js 22+ floor** since the openai SDK v7 bump. The OpenAI client also rejects an empty `apiKey` at construction, so `openai.ts` substitutes a placeholder to keep keyless self-hosted (vLLM) endpoints working.
@@ -53,6 +57,11 @@ src/
     action-schema.ts    Generates the coupled action union from Zod tool params,
                         with per-provider strictness normalization
     history-schema.ts   Validates history entries
+  decider/
+    decide.ts           consultDecider(): ask, resolve, apply minConfidence, validate
+    closed-params.ts    Which Zod param schemas a choose-only model can fill
+    questions.ts        Builds Choice questions and state; maps answers back to params
+    typesafe.ts         Raw fetch client for POST /v1/systemone with short retry
   providers/
     types.ts            Provider interface
     factory.ts          Provider instantiation by type
@@ -66,21 +75,25 @@ src/
     anthropic.ts        Anthropic OAuth flow
     openai.ts           OpenAI OAuth flow (local callback server)
     token-store.ts      Filesystem credential storage
-tests/                  Mirrors src/ structure, 84 unit tests
+tests/                  Mirrors src/ structure, 113 unit tests
 scripts/
-  e2e-live.ts           Live tests against real providers (vLLM, OpenAI, Anthropic)
+  e2e-live.ts           Live tests against real providers (vLLM, OpenAI, Anthropic, OpenRouter, TypeSafe)
+  bench-decider.ts      Decider vs LLM accuracy, latency and confidence calibration
 ```
 
 ## Commands
 
 - `bun run build` — Compile TypeScript to `dist/` (JS + declarations + source maps)
-- `bun test` — Run all tests (84 tests, ~2.5s)
+- `bun test` — Run all tests (113 tests)
 - `bun run lint` — Lint with Biome
 - `bun run lint:fix` — Auto-fix lint issues
 - `bun run typecheck` — Type check without emitting
 - `bun scripts/e2e-live.ts` — Live e2e against local vLLM (default)
 - `PROVIDER=openai OPENAI_API_KEY=... bun scripts/e2e-live.ts` — Against OpenAI
 - `PROVIDER=anthropic ANTHROPIC_API_KEY=... bun scripts/e2e-live.ts` — Against Anthropic
+- `PROVIDER=openrouter OPENROUTER_API_KEY=... bun scripts/e2e-live.ts` — Against OpenRouter (`OPENROUTER_MODEL`, default `openai/gpt-4o-mini`). Bun loads a gitignored `.env` automatically
+- `TYPESAFE_API_KEY=... bun scripts/e2e-live.ts` — Adds the decider tests in front of the chosen provider; `E2E_FILTER="without the LLM"` runs only the one that needs no LLM
+- `bun scripts/bench-decider.ts` — Benchmarks Jev alone, an OpenRouter LLM alone (`BENCH_MODEL`) and the hybrid pipeline on 51 scenarios with known answers; needs `TYPESAFE_API_KEY` and `OPENROUTER_API_KEY`. `BENCH_ARMS`, `BENCH_FILTER`, `BENCH_MIN_CONFIDENCE`, `BENCH_OUT` narrow or record a run
 
 ## Commit Conventions
 
@@ -134,6 +147,7 @@ feat!: remove deprecated setRules API
 - If `z.toJSONSchema()` returns empty/minimal output, check that you're on Zod v4. The function doesn't exist in v3.
 - Strict providers receive optional params as required-but-nullable. The model then returns explicit `null`s, which `agent.ts` strips (`omitNullObjectFields`) before re-validating against the tool's Zod schema. If you add a validation path, keep that fallback.
 - Relaxing a schema for a provider (stripping numeric keywords, merging the root object) only affects what the model is asked to produce. Never relax the Zod validation that follows it.
+- The decider path and the LLM path must agree on validation. If you change how params are validated in `askProvider`, check `judgeDecision` in `decider/decide.ts` too.
 - Provider-specific message formats differ: Anthropic uses `content: [{ type: "tool_use" }]` arrays, OpenAI uses `tool_calls` on assistant messages + `role: "tool"` messages.
 - vLLM needs `--enforce-eager` on some GPUs (particularly WSL) to avoid CUDA graph capture failures.
 - A non-conventional commit subject makes semantic-release analyse the merge as "no release", and the work silently never ships. CI now runs commitlint over each pull request's commit range to catch this.
