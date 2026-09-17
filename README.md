@@ -119,6 +119,17 @@ The same applies to parameter values. `params` can be a function of state, so wh
 
 The model cannot return an ID that is not in reach, and the result is validated against the schema built for that state. The function only runs for tools that pass `validWhen`.
 
+IDs mean little on their own. Describe each option and the description travels with it, both into the LLM's schema and into a decider's choices:
+
+```typescript
+params: (s) => z.object({
+  destination: z.union(s.places.map((p) => z.literal(p.id).describe(`${p.name} (${p.type})`))),
+  quantity: z.union([z.literal(s.held).describe("all you hold"), z.literal(1).describe("a single unit")]),
+}),
+```
+
+The second line is the general trick: a number or a price is often a short list of meaningful candidates computed from state, not a free-form value.
+
 ### Token Budgets
 
 You set explicit token budgets per section (instructions, history, tools). If any section exceeds its budget, the call is rejected with a `BudgetExceededError` — no silent truncation. This makes context overflow a build-time problem you fix once, not a runtime surprise.

@@ -75,7 +75,7 @@ src/
     anthropic.ts        Anthropic OAuth flow
     openai.ts           OpenAI OAuth flow (local callback server)
     token-store.ts      Filesystem credential storage
-tests/                  Mirrors src/ structure, 121 unit tests
+tests/                  Mirrors src/ structure, 124 unit tests
 scripts/
   e2e-live.ts           Live tests against real providers (vLLM, OpenAI, Anthropic, OpenRouter, TypeSafe)
   bench-decider.ts      Decider vs LLM accuracy, latency and confidence calibration
@@ -84,7 +84,7 @@ scripts/
 ## Commands
 
 - `bun run build` — Compile TypeScript to `dist/` (JS + declarations + source maps)
-- `bun test` — Run all tests (121 tests, ~5s)
+- `bun test` — Run all tests (124 tests, ~5s)
 - `bun run lint` — Lint with Biome
 - `bun run lint:fix` — Auto-fix lint issues
 - `bun run typecheck` — Type check without emitting

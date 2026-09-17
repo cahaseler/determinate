@@ -61,6 +61,23 @@ describe("buildQuestions", () => {
 		expect(buildQuestions(tools.slice(2))).toEqual({});
 	});
 
+	it("uses option labels as the criteria descriptions", () => {
+		const travel = describeTool(
+			"travel",
+			"Travel within the system",
+			z.object({
+				destination: z.union([
+					z.literal("sol_station").describe("Sol Station (has a base)"),
+					z.literal("belt_2"),
+				]),
+			}),
+		);
+		expect(buildQuestions([travel])["param:travel:destination"]?.criteria).toEqual({
+			sol_station: "Sol Station (has a base)",
+			belt_2: null,
+		});
+	});
+
 	it("asks the consumer's question when one is given", () => {
 		expect(buildQuestions(tools).tool?.instructions).toBe("Which action should be taken next?");
 		expect(

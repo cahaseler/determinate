@@ -17,15 +17,29 @@ describe("describeClosedParams", () => {
 				description: "How urgent",
 				optional: false,
 				values: { low: "low", high: "high" },
+				labels: {},
 			},
 			{
 				name: "notify",
 				description: undefined,
 				optional: false,
 				values: { true: true, false: false },
+				labels: {},
 			},
-			{ name: "kind", description: undefined, optional: false, values: { refund: "refund" } },
-			{ name: "tier", description: undefined, optional: false, values: { "1": 1, "2": 2 } },
+			{
+				name: "kind",
+				description: undefined,
+				optional: false,
+				values: { refund: "refund" },
+				labels: {},
+			},
+			{
+				name: "tier",
+				description: undefined,
+				optional: false,
+				values: { "1": 1, "2": 2 },
+				labels: {},
+			},
 		]);
 	});
 
@@ -72,6 +86,26 @@ describe("describeClosedParams", () => {
 
 	it("returns undefined for schemas JSON Schema cannot represent", () => {
 		expect(describeClosedParams(z.object({ when: z.date() }))).toBeUndefined();
+	});
+
+	it("keeps the description of each described literal as its label", () => {
+		const [destination, quantity] =
+			describeClosedParams(
+				z.object({
+					destination: z.union([
+						z.literal("sol_station").describe("Sol Station (has a base)"),
+						z.literal("belt_2"),
+					]),
+					quantity: z.union([
+						z.literal(12).describe("all you hold"),
+						z.literal(6).describe("half"),
+					]),
+				}),
+			) ?? [];
+
+		expect(destination?.labels).toEqual({ sol_station: "Sol Station (has a base)" });
+		expect(quantity?.values).toEqual({ "12": 12, "6": 6 });
+		expect(quantity?.labels).toEqual({ "12": "all you hold", "6": "half" });
 	});
 
 	it("drops optional free-form params only when asked to", () => {

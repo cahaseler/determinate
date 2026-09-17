@@ -12,6 +12,13 @@ export interface ClosedParam {
 	optional: boolean;
 	/** Choice option key -> the param value it stands for. */
 	values: Record<string, unknown>;
+	/** Choice option key -> what that value means, for options declared as described literals. */
+	labels: Record<string, string>;
+}
+
+interface Option {
+	value: unknown;
+	label?: string;
 }
 
 interface JsonSchemaNode {
@@ -28,14 +35,22 @@ interface JsonSchemaNode {
 const isPrimitive = (value: unknown): boolean =>
 	value === null || ["string", "number", "boolean"].includes(typeof value);
 
-/** Every value the node admits, or undefined when the set is open (strings, numbers, objects...). */
-function listValues(node: JsonSchemaNode): unknown[] | undefined {
-	if ("const" in node) return isPrimitive(node.const) ? [node.const] : undefined;
-	if (node.enum) return node.enum.every(isPrimitive) ? node.enum : undefined;
-	if (node.type === "boolean") return [true, false];
-	if (node.type === "null") return [null];
+const toOptions = (values: unknown[]): Option[] => values.map((value) => ({ value }));
+
+/**
+ * Every value the node admits, or undefined when the set is open (strings,
+ * numbers, objects...). A described literal, as in
+ * `z.literal("sol").describe("Sol Station")`, keeps its description as a label.
+ */
+function listOptions(node: JsonSchemaNode): Option[] | undefined {
+	if ("const" in node) {
+		return isPrimitive(node.const) ? [{ value: node.const, label: node.description }] : undefined;
+	}
+	if (node.enum) return node.enum.every(isPrimitive) ? toOptions(node.enum) : undefined;
+	if (node.type === "boolean") return toOptions([true, false]);
+	if (node.type === "null") return toOptions([null]);
 	if (!node.anyOf) return undefined;
-	const branches = node.anyOf.map(listValues);
+	const branches = node.anyOf.map(listOptions);
 	return branches.every((branch) => branch !== undefined) ? branches.flat() : undefined;
 }
 
@@ -44,13 +59,16 @@ function describeProperty(
 	node: JsonSchemaNode,
 	optional: boolean,
 ): ClosedParam | undefined {
-	const values = listValues(node);
-	if (!values) return undefined;
-	const keyed = Object.fromEntries(values.map((value) => [String(value), value]));
+	const options = listOptions(node);
+	if (!options) return undefined;
+	const keyed = Object.fromEntries(options.map(({ value }) => [String(value), value]));
 	const optionCount = Object.keys(keyed).length + (optional ? 1 : 0);
-	const isAmbiguous = Object.keys(keyed).length !== values.length || UNSET_OPTION in keyed;
+	const isAmbiguous = Object.keys(keyed).length !== options.length || UNSET_OPTION in keyed;
 	if (isAmbiguous || optionCount > MAX_CHOICE_OPTIONS) return undefined;
-	return { name, description: node.description, optional, values: keyed };
+	const labels = Object.fromEntries(
+		options.flatMap(({ value, label }) => (label ? [[String(value), label]] : [])),
+	);
+	return { name, description: node.description, optional, values: keyed, labels };
 }
 
 /**

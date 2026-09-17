@@ -56,7 +56,7 @@ const askParam = (tool: DeciderTool, param: ClosedParam): ChoiceQuestion => ({
 	criteria: Object.fromEntries(
 		listOptions(param).map((option) => [
 			option,
-			option === UNSET_OPTION ? "Leave this parameter out." : null,
+			option === UNSET_OPTION ? "Leave this parameter out." : (param.labels[option] ?? null),
 		]),
 	),
 });
