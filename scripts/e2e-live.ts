@@ -14,6 +14,7 @@
  *
  *   # Against OpenRouter:
  *   PROVIDER=openrouter OPENROUTER_API_KEY=sk-or-... OPENROUTER_MODEL=openai/gpt-4o-mini bun scripts/e2e-live.ts
+ *   (REASONING_EFFORT=low keeps a reasoning model such as z-ai/glm-5.3-flash quick)
  *
  *   # Custom vLLM URL/model:
  *   VLLM_BASE_URL=http://localhost:8000/v1 VLLM_MODEL=Qwen/Qwen3.5-4B bun scripts/e2e-live.ts
@@ -59,6 +60,7 @@ function getProviderConfig(): ProviderConfig {
 				type: "openrouter",
 				model: process.env.OPENROUTER_MODEL ?? "openai/gpt-4o-mini",
 				apiKey: process.env.OPENROUTER_API_KEY,
+				reasoningEffort: process.env.REASONING_EFFORT as ProviderConfig["reasoningEffort"],
 			};
 		default:
 			throw new Error(`Unknown provider: ${provider}`);

@@ -35,6 +35,8 @@ export class OutputError extends Error {
 	constructor(
 		message: string,
 		public readonly rawOutput: string,
+		/** False when asking again cannot help, e.g. the model ran out of output tokens. */
+		public readonly retryable: boolean = true,
 	) {
 		super(message);
 	}

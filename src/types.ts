@@ -8,6 +8,17 @@ export interface ProviderConfig {
 	apiKey?: string;
 	baseUrl?: string;
 	oauth?: boolean;
+	/**
+	 * How hard a reasoning model thinks before it answers. Choosing one action from
+	 * a short list rarely needs much: at their default effort, cheap reasoning models
+	 * can spend thousands of tokens (and most of a minute) per decision, and run out
+	 * of `max_tokens` before producing the answer at all. Sent as `reasoning.effort`
+	 * on OpenRouter and `reasoning_effort` on OpenAI. Ignored for Anthropic, where
+	 * thinking is off unless `options` turns it on, and for vLLM, which has no common
+	 * setting (pass `chat_template_kwargs` through `options`).
+	 */
+	reasoningEffort?: "minimal" | "low" | "medium" | "high";
+	/** Extra request-body fields, passed through as they are. They win over anything the library sets. */
 	options?: Record<string, unknown>;
 }
 
