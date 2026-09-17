@@ -125,6 +125,7 @@ export async function consultDecider<TState>({
 				tokensUsed: response.tokensUsed,
 				latency: performance.now() - start,
 				fallbackReason,
+				fallbackDetail: (err as Error).message,
 			},
 		};
 	}
