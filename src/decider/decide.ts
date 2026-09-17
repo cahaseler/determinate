@@ -84,7 +84,8 @@ export async function consultDecider<TState>({
 		description,
 		closedParams: describeClosedParams(params, config),
 	}));
-	const questions = buildQuestions(deciderTools);
+	const question = typeof config.question === "function" ? config.question() : config.question;
+	const questions = buildQuestions(deciderTools, { question });
 	const isForced = Object.keys(questions).length === 0;
 	if (tools.length > MAX_CHOICE_OPTIONS || (isForced && !deciderTools[0]?.closedParams)) {
 		return undefined;

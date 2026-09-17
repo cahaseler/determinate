@@ -53,6 +53,13 @@ export interface DeciderConfig {
 	/** Answers below this confidence (0–1) are handed to the LLM instead. Unset accepts every answer. */
 	minConfidence?: number;
 	/**
+	 * The question asked when choosing a tool. Defaults to "Which action should be
+	 * taken next?". A choose-only model answers the question it is asked, so put
+	 * the current objective here rather than leaving it somewhere in the
+	 * instructions. A function is called on every decision.
+	 */
+	question?: string | (() => string);
+	/**
 	 * A decider cannot write free-form values. By default one free-form param
 	 * sends the whole tool's params to the LLM. When true, free-form params that
 	 * are optional are left unset instead, so a tool like

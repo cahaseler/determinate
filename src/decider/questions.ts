@@ -61,20 +61,25 @@ const askParam = (tool: DeciderTool, param: ClosedParam): ChoiceQuestion => ({
 	),
 });
 
-const askTool = (tools: DeciderTool[]): ChoiceQuestion => ({
+export const DEFAULT_TOOL_QUESTION = "Which action should be taken next?";
+
+const askTool = (tools: DeciderTool[], question: string): ChoiceQuestion => ({
 	type: "choice",
-	instructions: "Which action should be taken next?",
+	instructions: question,
 	criteria: Object.fromEntries(tools.map(({ name, description }) => [name, description])),
 });
 
-export function buildQuestions(tools: DeciderTool[]): Record<string, ChoiceQuestion> {
+export function buildQuestions(
+	tools: DeciderTool[],
+	{ question = DEFAULT_TOOL_QUESTION }: { question?: string } = {},
+): Record<string, ChoiceQuestion> {
 	const paramQuestions = tools.flatMap((tool) =>
 		(tool.closedParams ?? [])
 			.filter(hasAlternatives)
 			.map((param) => [paramQuestionId(tool.name, param.name), askParam(tool, param)] as const),
 	);
 	return Object.fromEntries([
-		...(tools.length > 1 ? [[TOOL_QUESTION, askTool(tools)] as const] : []),
+		...(tools.length > 1 ? [[TOOL_QUESTION, askTool(tools, question)] as const] : []),
 		...paramQuestions,
 	]);
 }
