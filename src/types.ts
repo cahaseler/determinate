@@ -20,10 +20,19 @@ export interface TokenBudgets {
 export interface ToolDefinition<TState> {
 	name: string;
 	description: string;
-	params: z.ZodType;
+	/**
+	 * The tool's parameter schema, or a function of state that builds it. Use the
+	 * function form when the valid values live in state (the IDs in reach, the
+	 * items in stock): an enum of them constrains an LLM to real values and lets
+	 * a decider choose among them. Only called for tools that pass `validWhen`.
+	 */
+	params: z.ZodType | ((state: TState) => z.ZodType);
 	validWhen: (state: TState) => boolean;
 	instructions?: string;
 }
+
+/** A valid tool whose params have been built for the current state. */
+export type ResolvedTool<TState> = ToolDefinition<TState> & { params: z.ZodType };
 
 export interface ModelPricing {
 	input: number;
@@ -43,6 +52,13 @@ export interface DeciderConfig {
 	baseUrl?: string;
 	/** Answers below this confidence (0–1) are handed to the LLM instead. Unset accepts every answer. */
 	minConfidence?: number;
+	/**
+	 * A decider cannot write free-form values. By default one free-form param
+	 * sends the whole tool's params to the LLM. When true, free-form params that
+	 * are optional are left unset instead, so a tool like
+	 * `{ target: enum, note?: string }` stays with the decider.
+	 */
+	omitOptionalFreeForm?: boolean;
 	pricing?: ModelPricing;
 }
 

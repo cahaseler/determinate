@@ -1,7 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { NoValidToolsError } from "../errors";
 import { generateActionSchema } from "../schema/action-schema";
-import type { HistoryEntry, ProviderConfig, TokenBudgets, ToolDefinition } from "../types";
+import type {
+	HistoryEntry,
+	ProviderConfig,
+	ResolvedTool,
+	TokenBudgets,
+	ToolDefinition,
+} from "../types";
 import { enforceBudgets } from "./budget";
 import type { Tokenizer } from "./tokenizer";
 
@@ -16,20 +22,24 @@ interface AssembleInput<TState> {
 	providerModel?: string;
 }
 
-interface AssembledPayload {
+interface AssembledPayload<TState> {
 	messages: unknown[];
 	outputSchema: Record<string, unknown>;
 	validTools: string[];
+	/** The valid tools, with state-dependent params built for this state. */
+	tools: ResolvedTool<TState>[];
 	/** The consumer's instructions plus tool-specific instructions, as shown to the model. */
 	instructions: string;
 }
 
-export function assembleContext<TState>(input: AssembleInput<TState>): AssembledPayload {
+export function assembleContext<TState>(input: AssembleInput<TState>): AssembledPayload<TState> {
 	const { state, tools, history, instructions, budgets, tokenizer, providerType, providerModel } =
 		input;
 
-	// 1. Filter tools by validWhen
-	const validTools = tools.filter((t) => t.validWhen(state));
+	// 1. Filter tools by validWhen, then build any state-dependent params
+	const validTools = tools
+		.filter((t) => t.validWhen(state))
+		.map((t) => ({ ...t, params: typeof t.params === "function" ? t.params(state) : t.params }));
 	if (validTools.length === 0) {
 		throw new NoValidToolsError();
 	}
@@ -125,6 +135,7 @@ export function assembleContext<TState>(input: AssembleInput<TState>): Assembled
 		messages,
 		outputSchema,
 		validTools: validTools.map((t) => t.name),
+		tools: validTools,
 		instructions: fullInstructions,
 	};
 }

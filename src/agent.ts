@@ -96,7 +96,7 @@ export class Agent<TState> {
 
 	/** Asks the LLM for an action, re-asking with a correction message after malformed output. */
 	private async askProvider(
-		assembled: ReturnType<typeof assembleContext>,
+		assembled: ReturnType<typeof assembleContext<TState>>,
 		{ signal, outputRetries = 2 }: Pick<NextActionOptions, "signal" | "outputRetries">,
 	): Promise<ProviderResponse> {
 		const provider = await this.resolveProvider();
@@ -119,7 +119,7 @@ export class Agent<TState> {
 					);
 				}
 
-				const toolDef = this.config.tools.find((t) => t.name === response.action.tool);
+				const toolDef = assembled.tools.find((t) => t.name === response.action.tool);
 				if (toolDef) {
 					let paramsResult = toolDef.params.safeParse(response.action.params);
 					if (!paramsResult.success) {
@@ -162,7 +162,7 @@ export class Agent<TState> {
 			const decided = decider
 				? await consultDecider({
 						config: decider,
-						tools: tools.filter(({ name }) => assembled.validTools.includes(name)),
+						tools: assembled.tools,
 						instructions: assembled.instructions,
 						history: this.history,
 						signal,
@@ -173,7 +173,7 @@ export class Agent<TState> {
 			const asked = decided?.tool
 				? this.assemble(
 						state,
-						tools.filter(({ name }) => name === decided.tool),
+						assembled.tools.filter(({ name }) => name === decided.tool),
 					)
 				: assembled;
 			const response = decided?.action

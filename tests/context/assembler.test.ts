@@ -223,4 +223,42 @@ describe("context assembler", () => {
 		const systemMsg = findMessage(result.messages, (m) => m.role === "system");
 		expect(systemMsg.content as string).toContain("policy X");
 	});
+
+	it("builds state-dependent params for valid tools only", () => {
+		const built: string[] = [];
+		const dynamicTools: ToolDefinition<TestState>[] = [
+			{
+				name: "approve",
+				description: "Approve at a level the score allows",
+				params: (s) => {
+					built.push("approve");
+					return z.object({ level: z.enum(s.score < 0.5 ? ["fast", "normal"] : ["normal"]) });
+				},
+				validWhen: (s) => s.status === "pending",
+			},
+			{
+				name: "ship",
+				description: "Ship the item",
+				params: () => {
+					built.push("ship");
+					return z.object({});
+				},
+				validWhen: (s) => s.status === "approved",
+			},
+		];
+
+		const result = assembleContext({
+			state: { status: "pending", score: 0.3 },
+			tools: dynamicTools,
+			history: [],
+			instructions: () => "Test",
+			budgets: bigBudgets,
+			tokenizer: mockTokenizer,
+			providerType: "anthropic",
+		});
+
+		expect(built).toEqual(["approve"]);
+		expect(JSON.stringify(result.outputSchema)).toContain('"enum":["fast","normal"]');
+		expect(result.tools[0]?.params.safeParse({ level: "fast" }).success).toBe(true);
+	});
 });
