@@ -12,13 +12,22 @@
  *   # Against Anthropic:
  *   PROVIDER=anthropic ANTHROPIC_API_KEY=sk-ant-... bun scripts/e2e-live.ts
  *
+ *   # Against OpenRouter:
+ *   PROVIDER=openrouter OPENROUTER_API_KEY=sk-or-... OPENROUTER_MODEL=openai/gpt-4o-mini bun scripts/e2e-live.ts
+ *
  *   # Custom vLLM URL/model:
  *   VLLM_BASE_URL=http://localhost:8000/v1 VLLM_MODEL=Qwen/Qwen3.5-4B bun scripts/e2e-live.ts
+ *
+ *   # Also exercise the TypeSafe (Jev) decider in front of the chosen provider:
+ *   TYPESAFE_API_KEY=... PROVIDER=openai OPENAI_API_KEY=sk-... bun scripts/e2e-live.ts
+ *
+ *   # Run only tests whose name contains a substring (e.g. the decider test that needs no LLM):
+ *   TYPESAFE_API_KEY=... E2E_FILTER="without the LLM" bun scripts/e2e-live.ts
  */
 
 import { z } from "zod";
 import { createAgent } from "../src/index";
-import type { ProviderConfig } from "../src/types";
+import type { DeciderConfig, ProviderConfig } from "../src/types";
 
 // ── Configuration ──────────────────────────────────────────────────
 
@@ -45,9 +54,22 @@ function getProviderConfig(): ProviderConfig {
 				model: process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001",
 				apiKey: process.env.ANTHROPIC_API_KEY,
 			};
+		case "openrouter":
+			return {
+				type: "openrouter",
+				model: process.env.OPENROUTER_MODEL ?? "openai/gpt-4o-mini",
+				apiKey: process.env.OPENROUTER_API_KEY,
+			};
 		default:
 			throw new Error(`Unknown provider: ${provider}`);
 	}
+}
+
+function getDeciderConfig(): DeciderConfig | undefined {
+	const apiKey = process.env.TYPESAFE_API_KEY;
+	return apiKey
+		? { type: "typesafe", apiKey, model: process.env.TYPESAFE_MODEL, minConfidence: 0.5 }
+		: undefined;
 }
 
 // ── Test runner ────────────────────────────────────────────────────
@@ -66,6 +88,7 @@ async function runTest(
 	name: string,
 	fn: () => Promise<Record<string, unknown> | undefined>,
 ): Promise<void> {
+	if (!name.includes(process.env.E2E_FILTER ?? "")) return;
 	const start = performance.now();
 	process.stdout.write(`  ${name} ... `);
 	try {
@@ -395,6 +418,102 @@ await runTest("timeout aborts long requests", async () => {
 
 	return { status: "correctly threw AbortError" };
 });
+
+// ── Decider (TypeSafe Jev) ─────────────────────────────────────────
+
+const deciderConfig = getDeciderConfig();
+
+if (deciderConfig) {
+	await runTest("decider: closed-set action without the LLM", async () => {
+		const agent = createAgent({
+			provider: providerConfig,
+			decider: deciderConfig,
+			state: z.object({ temperature: z.number() }),
+			tools: [
+				{
+					name: "set_mode",
+					description: "Switch the HVAC system to a different mode",
+					params: z.object({
+						mode: z.enum(["heat", "cool", "off"]).describe("The HVAC mode to switch to."),
+						fan: z.boolean().describe("Whether to also run the circulation fan."),
+					}),
+					validWhen: () => true,
+				},
+				{
+					name: "do_nothing",
+					description: "Leave the HVAC system as it is",
+					params: z.object({}),
+					validWhen: () => true,
+				},
+			],
+			instructions: (s) =>
+				`You are a smart home controller. The HVAC system is off and it is ${s.temperature}°C indoors. The occupants are comfortable around 22°C. Always run the circulation fan while heating or cooling.`,
+			context: {
+				budgets: { instructions: 5000, history: 5000, tools: 2000 },
+			},
+		});
+
+		agent.setState({ temperature: 31 });
+		const result = await agent.nextAction({ timeout: 30000 });
+
+		if (result.meta.decider?.decided !== "action") {
+			throw new Error(
+				`Expected the decider to settle the action, got ${JSON.stringify(result.meta.decider)}`,
+			);
+		}
+		const { mode, fan } = result.action.params;
+		if (result.action.tool !== "set_mode" || mode !== "cool" || fan !== true) {
+			throw new Error(`Expected set_mode with cool and fan, got ${JSON.stringify(result.action)}`);
+		}
+
+		return {
+			action: result.action,
+			latency: Math.round(result.meta.latency),
+			decider: result.meta.decider,
+		};
+	});
+
+	await runTest("decider: picks the tool, LLM fills free-form params", async () => {
+		const agent = createAgent({
+			provider: providerConfig,
+			decider: deciderConfig,
+			state: z.object({ message: z.string() }),
+			tools: [
+				{
+					name: "reply",
+					description: "Answer the customer directly",
+					params: z.object({ message: z.string().describe("The reply to send") }),
+					validWhen: () => true,
+				},
+				{
+					name: "escalate",
+					description: "Hand the conversation to a specialist team",
+					params: z.object({ team: z.enum(["billing", "security", "engineering"]) }),
+					validWhen: () => true,
+				},
+			],
+			instructions: (s) =>
+				`You are a support agent for a note-taking app. Simple how-to questions get a direct reply. Customer message: "${s.message}"`,
+			context: {
+				budgets: { instructions: 5000, history: 5000, tools: 2000 },
+			},
+		});
+
+		agent.setState({ message: "How do I make a word bold in a note?" });
+		const result = await agent.nextAction({ timeout: 120000 });
+
+		if (result.meta.decider?.decided !== "tool") {
+			throw new Error(
+				`Expected the decider to settle only the tool, got ${JSON.stringify(result.meta.decider)}`,
+			);
+		}
+		if (result.action.tool !== "reply" || typeof result.action.params.message !== "string") {
+			throw new Error(`Expected a reply with a message, got ${JSON.stringify(result.action)}`);
+		}
+
+		return { action: result.action, model: result.meta.model, decider: result.meta.decider };
+	});
+}
 
 // ── Summary ────────────────────────────────────────────────────────
 

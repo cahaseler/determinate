@@ -1,15 +1,19 @@
 import { assembleContext } from "./context/assembler";
 import { createTokenizer, type Tokenizer } from "./context/tokenizer";
+import { consultDecider } from "./decider/decide";
 import { AbortError, OutputError, ProviderError, ValidationError } from "./errors";
 import { getOAuthApiKey } from "./oauth/index";
 import { createProvider } from "./providers/factory";
-import type { Provider } from "./providers/types";
+import type { Provider, ProviderResponse } from "./providers/types";
 import { type ValidatedHistoryEntry, validateHistory } from "./schema/history-schema";
 import type {
 	ActionResult,
 	AgentConfig,
 	HistoryEntry,
+	ModelPricing,
 	NextActionOptions,
+	TokenUsage,
+	ToolDefinition,
 	VerboseActionResult,
 } from "./types";
 
@@ -77,8 +81,72 @@ export class Agent<TState> {
 		return this.history;
 	}
 
+	private assemble(state: TState, tools: ToolDefinition<TState>[]) {
+		return assembleContext({
+			state,
+			tools,
+			history: this.history,
+			instructions: this.config.instructions,
+			budgets: this.config.context.budgets,
+			tokenizer: this.tokenizer,
+			providerType: this.config.provider.type,
+			providerModel: this.config.provider.model,
+		});
+	}
+
+	/** Asks the LLM for an action, re-asking with a correction message after malformed output. */
+	private async askProvider(
+		assembled: ReturnType<typeof assembleContext>,
+		{ signal, outputRetries = 2 }: Pick<NextActionOptions, "signal" | "outputRetries">,
+	): Promise<ProviderResponse> {
+		const provider = await this.resolveProvider();
+		const retryMessages = [...assembled.messages];
+
+		for (let attempt = 0; ; attempt++) {
+			try {
+				const response = await provider.sendRequest({
+					messages: retryMessages,
+					outputSchema: assembled.outputSchema,
+					model: this.config.provider.model,
+					options: this.config.provider.options,
+					signal,
+				});
+
+				if (!assembled.validTools.includes(response.action.tool)) {
+					throw new OutputError(
+						`Model returned tool "${response.action.tool}" which is not in the valid set: [${assembled.validTools.join(", ")}]`,
+						JSON.stringify(response.action),
+					);
+				}
+
+				const toolDef = this.config.tools.find((t) => t.name === response.action.tool);
+				if (toolDef) {
+					let paramsResult = toolDef.params.safeParse(response.action.params);
+					if (!paramsResult.success) {
+						paramsResult = toolDef.params.safeParse(omitNullObjectFields(response.action.params));
+					}
+					if (!paramsResult.success) {
+						throw new OutputError(
+							`Params for tool "${response.action.tool}" failed validation: ${paramsResult.error.issues.map((i) => i.message).join(", ")}`,
+							JSON.stringify(response.action),
+						);
+					}
+					response.action.params = paramsResult.data as Record<string, unknown>;
+				}
+				return response;
+			} catch (err) {
+				if (!(err instanceof OutputError) || attempt >= outputRetries) throw err;
+				retryMessages.push({
+					role: "user",
+					content: `Your previous response was invalid: ${err.message}. Respond only with one JSON object that exactly matches the supplied schema.`,
+				});
+			}
+		}
+	}
+
 	async nextAction(options?: NextActionOptions): Promise<ActionResult | VerboseActionResult> {
 		const state = this.getState();
+		const { tools, decider, pricing } = this.config;
 
 		let signal: AbortSignal | undefined = options?.signal;
 
@@ -88,86 +156,49 @@ export class Agent<TState> {
 		}
 
 		try {
-			const assembled = assembleContext({
-				state,
-				tools: this.config.tools,
-				history: this.history,
-				instructions: this.config.instructions,
-				budgets: this.config.context.budgets,
-				tokenizer: this.tokenizer,
-				providerType: this.config.provider.type,
-				providerModel: this.config.provider.model,
-			});
-
-			const provider = await this.resolveProvider();
+			const assembled = this.assemble(state, tools);
 			const start = performance.now();
-			const retryMessages = [...assembled.messages];
-			const outputRetries = options?.outputRetries ?? 2;
-			let response: Awaited<ReturnType<Provider["sendRequest"]>> | undefined;
-			let outputError: OutputError | undefined;
 
-			for (let attempt = 0; attempt <= outputRetries; attempt++) {
-				try {
-					response = await provider.sendRequest({
-						messages: retryMessages,
-						outputSchema: assembled.outputSchema,
-						model: this.config.provider.model,
-						options: this.config.provider.options,
+			const decided = decider
+				? await consultDecider({
+						config: decider,
+						tools: tools.filter(({ name }) => assembled.validTools.includes(name)),
+						instructions: assembled.instructions,
+						history: this.history,
 						signal,
-					});
+					})
+				: undefined;
 
-					if (!assembled.validTools.includes(response.action.tool)) {
-						throw new OutputError(
-							`Model returned tool "${response.action.tool}" which is not in the valid set: [${assembled.validTools.join(", ")}]`,
-							JSON.stringify(response.action),
-						);
-					}
-
-					const toolDef = this.config.tools.find((t) => t.name === response?.action.tool);
-					if (toolDef) {
-						let paramsResult = toolDef.params.safeParse(response.action.params);
-						if (!paramsResult.success) {
-							paramsResult = toolDef.params.safeParse(omitNullObjectFields(response.action.params));
-						}
-						if (!paramsResult.success) {
-							throw new OutputError(
-								`Params for tool "${response.action.tool}" failed validation: ${paramsResult.error.issues.map((i) => i.message).join(", ")}`,
-								JSON.stringify(response.action),
-							);
-						}
-						response.action.params = paramsResult.data as Record<string, unknown>;
-					}
-					outputError = undefined;
-					break;
-				} catch (err) {
-					if (!(err instanceof OutputError) || attempt === outputRetries) throw err;
-					outputError = err;
-					retryMessages.push({
-						role: "user",
-						content: `Your previous response was invalid: ${err.message}. Respond only with one JSON object that exactly matches the supplied schema.`,
-					});
-				}
-			}
-
-			if (!response || outputError)
-				throw outputError ?? new OutputError("Model returned no response", "");
+			// When the decider settled the tool but not its params, the LLM only sees that tool.
+			const asked = decided?.tool
+				? this.assemble(
+						state,
+						tools.filter(({ name }) => name === decided.tool),
+					)
+				: assembled;
+			const response = decided?.action
+				? undefined
+				: await this.askProvider(asked, { signal, outputRetries: options?.outputRetries });
+			const action = decided?.action ?? response?.action;
+			if (!action) throw new OutputError("Model returned no response", "");
 			const latency = performance.now() - start;
 
-			let cost: number | undefined;
-			if (this.config.pricing) {
-				const { input, output } = response.meta.tokensUsed;
-				cost =
-					(input / 1_000_000) * this.config.pricing.input +
-					(output / 1_000_000) * this.config.pricing.output;
-			}
+			const costs = [
+				response && pricing ? priceUsage(response.meta.tokensUsed, pricing) : undefined,
+				decided && decider?.pricing
+					? priceUsage(decided.meta.tokensUsed, decider.pricing)
+					: undefined,
+			].filter((cost) => cost !== undefined);
 
 			const result: ActionResult = {
-				action: response.action,
+				action,
 				meta: {
-					tokensUsed: response.meta.tokensUsed,
-					cost,
-					model: response.meta.model,
+					tokensUsed: response?.meta.tokensUsed ??
+						decided?.meta.tokensUsed ?? { input: 0, output: 0 },
+					cost: costs.length > 0 ? costs.reduce((sum, cost) => sum + cost, 0) : undefined,
+					model: response?.meta.model ?? decided?.meta.model ?? this.config.provider.model,
 					latency,
+					...(decided && { decider: decided.meta }),
 				},
 			};
 
@@ -175,9 +206,10 @@ export class Agent<TState> {
 				return {
 					...result,
 					context: {
-						messages: assembled.messages,
-						outputSchema: assembled.outputSchema,
+						messages: asked.messages,
+						outputSchema: asked.outputSchema,
 						validTools: assembled.validTools,
+						...(decided && { deciderRequest: decided.request }),
 					},
 				} as VerboseActionResult;
 			}
@@ -193,6 +225,9 @@ export class Agent<TState> {
 		}
 	}
 }
+
+const priceUsage = ({ input, output }: TokenUsage, pricing: ModelPricing): number =>
+	(input / 1_000_000) * pricing.input + (output / 1_000_000) * pricing.output;
 
 function omitNullObjectFields(value: unknown): unknown {
 	if (Array.isArray(value)) return value.map(omitNullObjectFields);

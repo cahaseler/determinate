@@ -20,6 +20,8 @@ interface AssembledPayload {
 	messages: unknown[];
 	outputSchema: Record<string, unknown>;
 	validTools: string[];
+	/** The consumer's instructions plus tool-specific instructions, as shown to the model. */
+	instructions: string;
 }
 
 export function assembleContext<TState>(input: AssembleInput<TState>): AssembledPayload {
@@ -119,5 +121,10 @@ export function assembleContext<TState>(input: AssembleInput<TState>): Assembled
 		content: "Choose the next action.",
 	});
 
-	return { messages, outputSchema, validTools: validTools.map((t) => t.name) };
+	return {
+		messages,
+		outputSchema,
+		validTools: validTools.map((t) => t.name),
+		instructions: fullInstructions,
+	};
 }
