@@ -273,6 +273,26 @@ describe("agent with a decider", () => {
 		});
 	});
 
+	it("treats any 5xx as transient, not only the listed ones", async () => {
+		respondAsDecider = () => new Response("gateway timeout", { status: 504 });
+
+		const result = await createTestAgent().nextAction();
+
+		expect(deciderRequests).toHaveLength(3);
+		expect(result.action.tool).toBe("reply");
+		expect(result.meta.decider?.fallbackReason).toBe("unavailable");
+	});
+
+	it("falls back to the LLM when a successful response is not JSON", async () => {
+		respondAsDecider = () => new Response("<html>Bad gateway</html>", { status: 200 });
+
+		const result = await createTestAgent().nextAction();
+
+		expect(deciderRequests).toHaveLength(3);
+		expect(result.action.tool).toBe("reply");
+		expect(result.meta.decider?.fallbackReason).toBe("unavailable");
+	});
+
 	it("throws rather than hiding a rejected decider request", async () => {
 		respondAsDecider = () => new Response("invalid api key", { status: 401 });
 

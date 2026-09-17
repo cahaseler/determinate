@@ -60,6 +60,28 @@ describe("buildQuestions", () => {
 		]);
 		expect(buildQuestions(tools.slice(2))).toEqual({});
 	});
+
+	it("keeps question IDs distinct when names contain the separator", () => {
+		const level = z.object({ "b:c": z.enum(["x", "y"]) });
+		const colliding = [
+			describeTool("a", "First", level),
+			describeTool("a:b", "Second", z.object({ c: z.enum(["p", "q"]) })),
+		];
+
+		const questions = buildQuestions(colliding);
+
+		expect(Object.keys(questions)).toEqual(["tool", "param:a:b%3Ac", "param:a%3Ab:c"]);
+		expect(
+			resolveDecision(
+				{
+					tool: { choice: "a:b", confidence: 1 },
+					"param:a:b%3Ac": { choice: "x", confidence: 1 },
+					"param:a%3Ab:c": { choice: "q", confidence: 1 },
+				},
+				colliding,
+			).params,
+		).toEqual({ c: "q" });
+	});
 });
 
 describe("buildState", () => {

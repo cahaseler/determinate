@@ -33,7 +33,9 @@ export interface Decision {
 	paramsConfidence: number;
 }
 
-const paramQuestionId = (tool: string, param: string): string => `param:${tool}:${param}`;
+/** Components are encoded so names containing ":" cannot make two params share an ID. */
+const paramQuestionId = (tool: string, param: string): string =>
+	`param:${encodeURIComponent(tool)}:${encodeURIComponent(param)}`;
 
 const listOptions = ({ values, optional }: ClosedParam): string[] => [
 	...Object.keys(values),
