@@ -163,6 +163,26 @@ describe("action schema generation", () => {
 		expect(serialized).not.toContain('"additionalProperties":{}');
 	});
 
+	it("expresses literals as single-value enums, never const", () => {
+		const schema = generateActionSchema([
+			{
+				name: "travel",
+				description: "Travel",
+				params: z.object({
+					destination: z.union([z.literal("sol").describe("Sol Station"), z.literal("belt")]),
+				}),
+			},
+		]);
+		expect(JSON.stringify(schema)).not.toContain('"const"');
+		const branch = schema as unknown as ActionBranch;
+		expect(branch.properties.params.properties?.destination).toEqual({
+			anyOf: [
+				{ type: "string", enum: ["sol"], description: "Sol Station" },
+				{ type: "string", enum: ["belt"] },
+			],
+		});
+	});
+
 	it("throws on an empty tool list", () => {
 		expect(() => generateActionSchema([])).toThrow();
 	});

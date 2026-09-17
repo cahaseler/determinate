@@ -114,7 +114,9 @@ function normalizeStrictSchema(value: unknown): unknown {
 	const schema = value as JsonSchemaObject;
 	const normalized: JsonSchemaObject = {};
 	for (const [key, child] of Object.entries(schema)) {
-		normalized[key] = normalizeStrictSchema(child);
+		// `const` is unsound in vLLM's xgrammar; a single-value enum means the same everywhere.
+		if (key === "const") normalized.enum = [child];
+		else normalized[key] = normalizeStrictSchema(child);
 	}
 
 	if (schema.properties) {
