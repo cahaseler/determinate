@@ -106,6 +106,19 @@ Define your environment state as a Zod schema. The library validates it and pass
 
 Each tool has a `validWhen` predicate evaluated against current state. Only valid tools are presented to the model, and the constrained output schema makes it physically impossible for the model to choose an invalid tool. This is least-privilege enforced structurally, not by hoping the model follows instructions.
 
+The same applies to parameter values. `params` can be a function of state, so when the valid values live in state you can hand the model an enum of them instead of a string and a list to copy from:
+
+```typescript
+{
+  name: "travel",
+  description: "Travel to a location in the current system",
+  params: (s) => z.object({ destination: z.enum(s.reachableLocationIds) }),
+  validWhen: (s) => s.reachableLocationIds.length > 0,
+}
+```
+
+The model cannot return an ID that is not in reach, and the result is validated against the schema built for that state. The function only runs for tools that pass `validWhen`.
+
 ### Token Budgets
 
 You set explicit token budgets per section (instructions, history, tools). If any section exceeds its budget, the call is rejected with a `BudgetExceededError` — no silent truncation. This makes context overflow a build-time problem you fix once, not a runtime surprise.
@@ -191,6 +204,8 @@ On each `nextAction()`, one request asks Jev which valid tool comes next and, fo
 - **Jev is unreachable, overloaded, or returns something outside the declared options.** The LLM makes the decision. A rejected request (bad key, invalid payload) throws a `ProviderError` instead of falling back.
 
 Whatever Jev picks is validated against the tool's Zod schema like any LLM output, so refinements and defaults still apply. Jev receives the same things the LLM would: the output of `instructions(state)`, the history, and the tool descriptions. Param `.describe()` text becomes part of the question, so describe your enums.
+
+Two things widen what counts as closed-set. State-dependent `params` (above) turn ID strings into enums Jev can choose from. And `decider.omitOptionalFreeForm: true` leaves optional free-form params unset rather than sending the tool to the LLM, which suits tools that carry something like an optional `note` or `thoughts` string. Leave it off when an optional string is the point of the tool.
 
 Three things matter in practice, all observed running `scripts/bench-decider.ts` (51 scenarios with known answers) against the live API:
 

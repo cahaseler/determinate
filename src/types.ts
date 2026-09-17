@@ -20,10 +20,19 @@ export interface TokenBudgets {
 export interface ToolDefinition<TState> {
 	name: string;
 	description: string;
-	params: z.ZodType;
+	/**
+	 * The tool's parameter schema, or a function of state that builds it. Use the
+	 * function form when the valid values live in state (the IDs in reach, the
+	 * items in stock): an enum of them constrains an LLM to real values and lets
+	 * a decider choose among them. Only called for tools that pass `validWhen`.
+	 */
+	params: z.ZodType | ((state: TState) => z.ZodType);
 	validWhen: (state: TState) => boolean;
 	instructions?: string;
 }
+
+/** A valid tool whose params have been built for the current state. */
+export type ResolvedTool<TState> = ToolDefinition<TState> & { params: z.ZodType };
 
 export interface ModelPricing {
 	input: number;
@@ -43,6 +52,20 @@ export interface DeciderConfig {
 	baseUrl?: string;
 	/** Answers below this confidence (0–1) are handed to the LLM instead. Unset accepts every answer. */
 	minConfidence?: number;
+	/**
+	 * The question asked when choosing a tool. Defaults to "Which action should be
+	 * taken next?". A choose-only model answers the question it is asked, so put
+	 * the current objective here rather than leaving it somewhere in the
+	 * instructions. A function is called on every decision.
+	 */
+	question?: string | (() => string);
+	/**
+	 * A decider cannot write free-form values. By default one free-form param
+	 * sends the whole tool's params to the LLM. When true, free-form params that
+	 * are optional are left unset instead, so a tool like
+	 * `{ target: enum, note?: string }` stays with the decider.
+	 */
+	omitOptionalFreeForm?: boolean;
 	pricing?: ModelPricing;
 }
 
@@ -93,6 +116,8 @@ export interface DeciderMeta {
 	toolProbabilities?: Record<string, number>;
 	/** Why the LLM was asked for something the decider could have settled. */
 	fallbackReason?: DeciderFallbackReason;
+	/** The decider's own failure message when it was unavailable or returned invalid output, e.g. "HTTP 429: ...". */
+	fallbackDetail?: string;
 }
 
 export interface ActionMeta {

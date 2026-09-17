@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { z } from "zod";
-import { ProviderError } from "../../src/errors";
+import { OutputError, ProviderError } from "../../src/errors";
 import { createAgent } from "../../src/index";
-import type { VerboseActionResult } from "../../src/types";
+import type { ToolDefinition, VerboseActionResult } from "../../src/types";
 
 type Body = Record<string, unknown>;
 
@@ -96,10 +96,12 @@ describe("agent with a decider", () => {
 
 	const createTestAgent = ({
 		minConfidence,
+		omitOptionalFreeForm,
 		agentTools = tools,
 	}: {
 		minConfidence?: number;
-		agentTools?: typeof tools;
+		omitOptionalFreeForm?: boolean;
+		agentTools?: ToolDefinition<z.infer<typeof stateSchema>>[];
 	} = {}) => {
 		const agent = createAgent({
 			provider: {
@@ -113,6 +115,7 @@ describe("agent with a decider", () => {
 				apiKey: "ts-key",
 				baseUrl: `http://localhost:${deciderServer.port}`,
 				minConfidence,
+				omitOptionalFreeForm,
 				pricing: { input: 0.042, output: 0 },
 			},
 			pricing: { input: 2.5, output: 10 },
@@ -269,6 +272,7 @@ describe("agent with a decider", () => {
 		expect(result.meta.decider).toMatchObject({
 			decided: "none",
 			fallbackReason: "unavailable",
+			fallbackDetail: "HTTP 529: overloaded",
 			tokensUsed: { input: 0, output: 0 },
 		});
 	});
@@ -316,6 +320,45 @@ describe("agent with a decider", () => {
 		expect(deciderRequests).toHaveLength(0);
 		expect(llmRequests).toHaveLength(1);
 		expect(result.meta.decider).toBeUndefined();
+	});
+
+	it("offers state-built enums to the decider and skips optional free-form params", async () => {
+		const assign: ToolDefinition<z.infer<typeof stateSchema>> = {
+			name: "assign",
+			description: "Assign the ticket to an engineer who is on call",
+			params: (s) =>
+				z.object({
+					engineer: z.enum(s.ticket.includes("down") ? ["ana", "raj"] : ["lee"]),
+					thoughts: z.string().optional(),
+				}),
+			validWhen: () => true,
+		};
+		answerWith({ tool: answer("assign"), "param:assign:engineer": answer("raj") });
+
+		const result = await createTestAgent({
+			omitOptionalFreeForm: true,
+			agentTools: [assign, ...tools.slice(1)],
+		}).nextAction();
+
+		expect(result.action).toEqual({ tool: "assign", params: { engineer: "raj" } });
+		expect(llmRequests).toHaveLength(0);
+		const questions = deciderRequests[0]?.body.questions as Record<string, { criteria: Body }>;
+		expect(Object.keys(questions["param:assign:engineer"]?.criteria ?? {})).toEqual(["ana", "raj"]);
+	});
+
+	it("validates LLM params against the state-built schema", async () => {
+		const assign: ToolDefinition<z.infer<typeof stateSchema>> = {
+			name: "assign",
+			description: "Assign the ticket",
+			params: () => z.object({ engineer: z.enum(["ana", "raj"]), note: z.string() }),
+			validWhen: () => true,
+		};
+		answerWith({ tool: answer("assign") });
+		llmAction = { tool: "assign", params: { engineer: "lee", note: "urgent" } };
+
+		await expect(
+			createTestAgent({ agentTools: [assign, ...tools.slice(1)] }).nextAction({ outputRetries: 0 }),
+		).rejects.toThrow(OutputError);
 	});
 
 	it("includes the decider request in verbose output", async () => {

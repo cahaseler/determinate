@@ -73,4 +73,22 @@ describe("describeClosedParams", () => {
 	it("returns undefined for schemas JSON Schema cannot represent", () => {
 		expect(describeClosedParams(z.object({ when: z.date() }))).toBeUndefined();
 	});
+
+	it("drops optional free-form params only when asked to", () => {
+		const params = z.object({
+			target: z.enum(["a", "b"]),
+			thoughts: z.string().optional(),
+			retries: z.number().default(1),
+		});
+
+		expect(describeClosedParams(params)).toBeUndefined();
+		expect(
+			describeClosedParams(params, { omitOptionalFreeForm: true })?.map(({ name }) => name),
+		).toEqual(["target"]);
+	});
+
+	it("never drops a required free-form param", () => {
+		const params = z.object({ target: z.enum(["a", "b"]), message: z.string() });
+		expect(describeClosedParams(params, { omitOptionalFreeForm: true })).toBeUndefined();
+	});
 });

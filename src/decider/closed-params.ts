@@ -56,9 +56,14 @@ function describeProperty(
 /**
  * Describes a tool's params when every one of them draws from a finite set of
  * primitives, so a model that can only choose (not generate) can fill them.
- * Returns undefined when any param needs free-form output.
+ * Returns undefined when any param needs free-form output. With
+ * `omitOptionalFreeForm`, optional params the model cannot fill are dropped
+ * (left unset) instead of disqualifying the tool.
  */
-export function describeClosedParams(params: z.ZodType): ClosedParam[] | undefined {
+export function describeClosedParams(
+	params: z.ZodType,
+	{ omitOptionalFreeForm = false }: { omitOptionalFreeForm?: boolean } = {},
+): ClosedParam[] | undefined {
 	let root: JsonSchemaNode;
 	try {
 		// Input mode keeps defaulted fields optional, so leaving one unset lets Zod apply the default.
@@ -72,8 +77,10 @@ export function describeClosedParams(params: z.ZodType): ClosedParam[] | undefin
 	if (!isClosedObject) return undefined;
 
 	const required = new Set(root.required ?? []);
-	const described = Object.entries(root.properties ?? {}).map(([name, node]) =>
-		describeProperty(name, node, !required.has(name)),
-	);
+	const described = Object.entries(root.properties ?? {}).flatMap(([name, node]) => {
+		const optional = !required.has(name);
+		const param = describeProperty(name, node, optional);
+		return !param && optional && omitOptionalFreeForm ? [] : [param];
+	});
 	return described.every((param) => param !== undefined) ? described : undefined;
 }

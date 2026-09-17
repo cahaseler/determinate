@@ -5,7 +5,7 @@ import type {
 	DeciderFallbackReason,
 	DeciderMeta,
 	HistoryEntry,
-	ToolDefinition,
+	ResolvedTool,
 } from "../types";
 import { describeClosedParams, MAX_CHOICE_OPTIONS } from "./closed-params";
 import { buildQuestions, buildState, type Decision, resolveDecision } from "./questions";
@@ -28,7 +28,7 @@ export interface DeciderOutcome {
 interface ConsultInput<TState> {
 	config: DeciderConfig;
 	/** Tools that passed validWhen. */
-	tools: ToolDefinition<TState>[];
+	tools: ResolvedTool<TState>[];
 	instructions: string;
 	history: HistoryEntry[];
 	signal?: AbortSignal;
@@ -44,7 +44,7 @@ function explainFailure(err: unknown): DeciderFallbackReason | undefined {
 /** Settles how much of the decision to trust: the whole action, just the tool, or nothing. */
 function judgeDecision<TState>(
 	decision: Decision,
-	tools: ToolDefinition<TState>[],
+	tools: ResolvedTool<TState>[],
 	minConfidence: number,
 ): Pick<DeciderMeta, "decided" | "confidence" | "fallbackReason"> & { action?: Action } {
 	const { tool, toolConfidence, params, paramsConfidence } = decision;
@@ -82,9 +82,10 @@ export async function consultDecider<TState>({
 	const deciderTools = tools.map(({ name, description, params }) => ({
 		name,
 		description,
-		closedParams: describeClosedParams(params),
+		closedParams: describeClosedParams(params, config),
 	}));
-	const questions = buildQuestions(deciderTools);
+	const question = typeof config.question === "function" ? config.question() : config.question;
+	const questions = buildQuestions(deciderTools, { question });
 	const isForced = Object.keys(questions).length === 0;
 	if (tools.length > MAX_CHOICE_OPTIONS || (isForced && !deciderTools[0]?.closedParams)) {
 		return undefined;
@@ -124,6 +125,7 @@ export async function consultDecider<TState>({
 				tokensUsed: response.tokensUsed,
 				latency: performance.now() - start,
 				fallbackReason,
+				fallbackDetail: (err as Error).message,
 			},
 		};
 	}

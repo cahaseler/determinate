@@ -61,6 +61,14 @@ describe("buildQuestions", () => {
 		expect(buildQuestions(tools.slice(2))).toEqual({});
 	});
 
+	it("asks the consumer's question when one is given", () => {
+		expect(buildQuestions(tools).tool?.instructions).toBe("Which action should be taken next?");
+		expect(
+			buildQuestions(tools, { question: "Which action best advances: close the ticket?" }).tool
+				?.instructions,
+		).toBe("Which action best advances: close the ticket?");
+	});
+
 	it("keeps question IDs distinct when names contain the separator", () => {
 		const level = z.object({ "b:c": z.enum(["x", "y"]) });
 		const colliding = [
