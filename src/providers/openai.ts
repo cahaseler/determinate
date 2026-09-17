@@ -4,6 +4,14 @@ import type { ProviderConfig } from "../types";
 import { parseActionFromJson } from "./parse-action";
 import type { Provider, ProviderRequest, ProviderResponse } from "./types";
 
+/**
+ * The OpenAI SDK rejects a missing or empty `apiKey` at construction time, but
+ * self-hosted endpoints (vLLM) do not need credentials. Fall back to a
+ * placeholder so those agents still build and so genuine auth failures surface
+ * as a typed ProviderError from the API rather than an untyped SDK throw.
+ */
+const PLACEHOLDER_API_KEY = "not-needed";
+
 export class OpenAIProvider implements Provider {
 	private client: OpenAI;
 	private config: ProviderConfig;
@@ -11,7 +19,7 @@ export class OpenAIProvider implements Provider {
 	constructor(config: ProviderConfig) {
 		this.config = config;
 		this.client = new OpenAI({
-			apiKey: config.apiKey ?? "",
+			apiKey: config.apiKey || PLACEHOLDER_API_KEY,
 			baseURL: config.baseUrl,
 		});
 	}

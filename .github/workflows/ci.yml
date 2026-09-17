@@ -10,13 +10,24 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+        with:
+          # Full history so commitlint can walk the pull request's commit range.
+          fetch-depth: 0
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
       - run: bun install --frozen-lockfile
+
+      - name: Lint commit messages
+        if: github.event_name == 'pull_request'
+        run: >-
+          bunx commitlint
+          --from ${{ github.event.pull_request.base.sha }}
+          --to ${{ github.event.pull_request.head.sha }}
+          --verbose
 
       - name: Lint
         run: bunx biome check src/ tests/ scripts/
