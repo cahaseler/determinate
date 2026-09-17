@@ -29,7 +29,7 @@ Consumer Loop
 - **Zod v4 required** (peer dep `>=4.0.0`). Uses `z.toJSONSchema()` for schema generation — the third-party `zod-to-json-schema` is broken with Zod v4.
 - **Discriminated union uses single-value `enum`**, not `const`. The `const` keyword is unsound in vLLM's xgrammar constrained decoding. See `research/schema-portability-research.md`.
 - **Action union couples each tool to its own params.** Every branch of the union is `{ tool: { enum: ["<name>"] }, params: <that tool's schema> }`, so a crossed tool/params pair is structurally invalid and a constrained decoder rejects it. This replaced an earlier design where `tool` and `params` were declared independently and a hidden `tool_name` discriminant lived inside `params`; models could satisfy that schema while pairing one tool with another tool's parameters.
-- **Provider-specific schema relaxation** happens at generation time only, in `generateActionSchema` options. OpenAI (and `openai/*` on OpenRouter) forbids root-level unions and optional object properties, so it gets a merged strict root object; Anthropic (and `anthropic/*` on OpenRouter) rejects several numeric keywords, which get stripped. The chosen action is always validated against the authoritative per-tool Zod schema afterwards, so relaxation never weakens validation.
+- **Provider-specific schema relaxation** happens at generation time only, in `generateActionSchema` options. OpenAI (and `openai/*` on OpenRouter) forbids root-level unions and optional object properties, so the coupled union is nested under a root `action` property that `parse-action.ts` unwraps (an earlier version merged every tool's params into one all-nullable object, which lost the coupling and each tool's required fields, and made cheap OpenAI models omit required params); Anthropic (and `anthropic/*` on OpenRouter) rejects several numeric keywords, which get stripped. The chosen action is always validated against the authoritative per-tool Zod schema afterwards, so relaxation never weakens validation.
 - **Optional params become required-but-nullable** for strict structured-output providers. `agent.ts` retries validation with null placeholders removed (`omitNullObjectFields`) before reporting a params failure.
 - **Malformed output is recoverable.** `nextAction()` re-asks up to `outputRetries` times (default 2) with a correction message appended. `parse-action.ts` additionally recovers DeepSeek's native DSML tool-call envelope when a model degrades out of JSON structured output.
 - **History formatted as provider-native tool-calling messages** (tool_use/tool_result for Anthropic, tool_calls/tool for OpenAI). This exploits model training on tool-calling patterns.
@@ -75,7 +75,7 @@ src/
     anthropic.ts        Anthropic OAuth flow
     openai.ts           OpenAI OAuth flow (local callback server)
     token-store.ts      Filesystem credential storage
-tests/                  Mirrors src/ structure, 119 unit tests
+tests/                  Mirrors src/ structure, 121 unit tests
 scripts/
   e2e-live.ts           Live tests against real providers (vLLM, OpenAI, Anthropic, OpenRouter, TypeSafe)
   bench-decider.ts      Decider vs LLM accuracy, latency and confidence calibration
@@ -84,7 +84,7 @@ scripts/
 ## Commands
 
 - `bun run build` — Compile TypeScript to `dist/` (JS + declarations + source maps)
-- `bun test` — Run all tests (119 tests, ~5s)
+- `bun test` — Run all tests (121 tests, ~5s)
 - `bun run lint` — Lint with Biome
 - `bun run lint:fix` — Auto-fix lint issues
 - `bun run typecheck` — Type check without emitting

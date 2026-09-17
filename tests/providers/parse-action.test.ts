@@ -10,6 +10,18 @@ describe("action response parsing", () => {
 		});
 	});
 
+	it("unwraps an action nested under a root object", () => {
+		expect(parseActionFromJson('{"action":{"tool":"jump","params":{"to":"sol"}}}')).toEqual({
+			tool: "jump",
+			params: { to: "sol" },
+		});
+	});
+
+	it("rejects a nested action that lacks a tool", () => {
+		expect(() => parseActionFromJson('{"action":{"params":{}}}')).toThrow(OutputError);
+		expect(() => parseActionFromJson("null")).toThrow(OutputError);
+	});
+
 	it("normalizes a DeepSeek DSML tool call", () => {
 		const raw = `<｜DSML｜tool_calls>
 <｜DSML｜invoke name="view_market">

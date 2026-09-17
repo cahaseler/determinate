@@ -103,22 +103,28 @@ describe("action schema generation", () => {
 		expect(schema.properties.params.properties).toHaveProperty("note");
 	});
 
-	it("uses an OpenAI-compatible strict root object when requested", () => {
+	it("nests the coupled union under a root object for providers that forbid a root union", () => {
 		const schema = generateActionSchema(tools, { strictRootObject: true }) as {
 			type: string;
 			anyOf?: unknown;
-			properties: {
-				tool: { enum: string[] };
-				params: { properties: Record<string, unknown>; required: string[] };
-			};
+			required: string[];
+			additionalProperties: boolean;
+			properties: { action: { anyOf: ActionBranch[] } };
 		};
 		expect(schema.type).toBe("object");
 		expect(schema.anyOf).toBeUndefined();
-		expect(schema.properties.tool.enum).toEqual(["approve_order", "reject_order"]);
-		expect(schema.properties.params.required).toEqual(["note", "reason"]);
-		expect(schema.properties.params.properties.note).toEqual({
-			anyOf: [{ type: "string" }, { type: "null" }],
-		});
+		expect(schema.required).toEqual(["action"]);
+		expect(schema.additionalProperties).toBe(false);
+
+		const branches = schema.properties.action.anyOf;
+		expect(branches.map((branch) => branch.properties.tool.enum)).toEqual([
+			["approve_order"],
+			["reject_order"],
+		]);
+		// Each tool keeps its own params, and its required fields stay required.
+		expect(Object.keys(branches[0]?.properties.params.properties ?? {})).toEqual(["note"]);
+		expect(branches[1]?.properties.params.required).toEqual(["reason"]);
+		expect(branches[1]?.properties.params.properties?.reason).toEqual({ type: "string" });
 	});
 
 	it("strips unsupported numeric constraints for limited providers", () => {

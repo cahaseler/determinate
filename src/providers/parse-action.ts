@@ -11,7 +11,12 @@ export function parseActionFromJson(raw: string): Action {
 		throw new OutputError("Failed to parse response as JSON or a DeepSeek tool call", raw);
 	}
 
-	const action = parsed as { tool?: string; params?: Record<string, unknown> };
+	// Providers that cannot take a root-level union receive it nested under `action`.
+	const { action: nested } = (parsed ?? {}) as { action?: unknown };
+	const action = (nested && typeof nested === "object" ? nested : (parsed ?? {})) as {
+		tool?: string;
+		params?: Record<string, unknown>;
+	};
 	if (
 		typeof action.tool !== "string" ||
 		typeof action.params !== "object" ||

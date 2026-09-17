@@ -174,7 +174,7 @@ provider: { type: "openrouter", model: "anthropic/claude-sonnet-4-5", apiKey: pr
 
 The same Zod tool definitions produce JSON Schema that one provider accepts and another rejects, so the generated schema is adapted per provider:
 
-- **OpenAI** (and `openai/*` models on OpenRouter) forbids root-level unions and optional object properties, so it receives a single strict root object with optional params expressed as nullable.
+- **OpenAI** (and `openai/*` models on OpenRouter) forbids a union at the schema root and optional object properties. The per-tool union is nested under a root `action` property, which the parser unwraps, and optional params are expressed as nullable. Each tool still carries only its own params, with its required fields required.
 - **Anthropic** (and `anthropic/*` on OpenRouter) rejects several numeric keywords (`minimum`, `maximum`, `multipleOf`, and the exclusive forms), so those are stripped.
 
 This relaxation applies only to what the model is asked to generate. The action it returns is still validated against your original, unrelaxed Zod schema, and null placeholders for optional fields are removed before that check.
