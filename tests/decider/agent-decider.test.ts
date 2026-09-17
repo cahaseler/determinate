@@ -128,11 +128,16 @@ describe("agent with a decider", () => {
 		return agent;
 	};
 
+	/** Tools the LLM was offered: one branch when narrowed, otherwise the union nested under `action`. */
 	const llmToolEnum = () => {
+		type Branch = { properties: { tool: { enum: string[] } } };
 		const format = llmRequests[0]?.response_format as {
-			json_schema: { schema: { properties: { tool: { enum: string[] } } } };
+			json_schema: { schema: Branch & { properties: { action?: { anyOf: Branch[] } } } };
 		};
-		return format.json_schema.schema.properties.tool.enum;
+		const { schema } = format.json_schema;
+		return (schema.properties.action?.anyOf ?? [schema]).flatMap(
+			(branch) => branch.properties.tool.enum,
+		);
 	};
 
 	it("returns a closed-set action without calling the LLM", async () => {

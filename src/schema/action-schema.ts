@@ -49,7 +49,7 @@ export function generateActionSchema(
 		throw new Error("Cannot generate action schema with zero tools");
 	}
 	if (options.strictRootObject && actionBranches.length > 1) {
-		return generateStrictRootSchema(actionBranches);
+		return nestUnionUnderRoot(actionBranches);
 	}
 	return actionBranches.length === 1 ? firstBranch : { anyOf: actionBranches };
 }
@@ -85,43 +85,18 @@ function stripNumericConstraints(value: unknown): unknown {
 	);
 }
 
-function generateStrictRootSchema(
+/**
+ * OpenAI rejects a union at the schema root but accepts one under a property,
+ * so the coupled branches move one level down. `parseActionFromJson` unwraps
+ * the result. Each tool keeps its own params and its own required fields.
+ */
+function nestUnionUnderRoot(
 	actionBranches: Array<Record<string, unknown>>,
 ): Record<string, unknown> {
-	const toolNames: string[] = [];
-	const variants = new Map<string, unknown[]>();
-	for (const branch of actionBranches) {
-		const properties = branch.properties as Record<string, JsonSchemaObject>;
-		const tool = properties.tool?.enum as string[];
-		toolNames.push(...tool);
-		const params = properties.params?.properties ?? {};
-		for (const [name, schema] of Object.entries(params)) {
-			const existing = variants.get(name) ?? [];
-			if (!existing.some((candidate) => JSON.stringify(candidate) === JSON.stringify(schema))) {
-				existing.push(schema);
-			}
-			variants.set(name, existing);
-		}
-	}
-
-	const mergedParams = Object.fromEntries(
-		[...variants].map(([name, schemas]) => [
-			name,
-			makeNullable(schemas.length === 1 ? schemas[0] : { anyOf: schemas }),
-		]),
-	);
 	return {
 		type: "object",
-		properties: {
-			tool: { type: "string", enum: toolNames },
-			params: {
-				type: "object",
-				properties: mergedParams,
-				required: Object.keys(mergedParams),
-				additionalProperties: false,
-			},
-		},
-		required: ["tool", "params"],
+		properties: { action: { anyOf: actionBranches } },
+		required: ["action"],
 		additionalProperties: false,
 	};
 }
