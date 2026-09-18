@@ -71,17 +71,23 @@ function describeProperty(
 	return { name, description: node.description, optional, values: keyed, labels };
 }
 
+export interface ParamSurvey {
+	/** The params a model that can only choose (not generate) can fill. */
+	closed: ClosedParam[];
+	/** True when `closed` covers every param the model has to supply. */
+	complete: boolean;
+}
+
 /**
- * Describes a tool's params when every one of them draws from a finite set of
- * primitives, so a model that can only choose (not generate) can fill them.
- * Returns undefined when any param needs free-form output. With
- * `omitOptionalFreeForm`, optional params the model cannot fill are dropped
- * (left unset) instead of disqualifying the tool.
+ * Sorts a tool's params into those that draw from a finite set of primitives
+ * and those that need free-form output. Returns undefined when the params are
+ * not a closed object. With `omitOptionalFreeForm`, optional params the model
+ * cannot fill are dropped (left unset) rather than counted as free-form.
  */
-export function describeClosedParams(
+export function surveyParams(
 	params: z.ZodType,
 	{ omitOptionalFreeForm = false }: { omitOptionalFreeForm?: boolean } = {},
-): ClosedParam[] | undefined {
+): ParamSurvey | undefined {
 	let root: JsonSchemaNode;
 	try {
 		// Input mode keeps defaulted fields optional, so leaving one unset lets Zod apply the default.
@@ -100,5 +106,17 @@ export function describeClosedParams(
 		const param = describeProperty(name, node, optional);
 		return !param && optional && omitOptionalFreeForm ? [] : [param];
 	});
-	return described.every((param) => param !== undefined) ? described : undefined;
+	return {
+		closed: described.filter((param): param is ClosedParam => param !== undefined),
+		complete: described.every((param) => param !== undefined),
+	};
+}
+
+/** The params of a tool a choose-only model can fill outright; undefined when any needs free-form output. */
+export function describeClosedParams(
+	params: z.ZodType,
+	options: { omitOptionalFreeForm?: boolean } = {},
+): ClosedParam[] | undefined {
+	const survey = surveyParams(params, options);
+	return survey?.complete ? survey.closed : undefined;
 }

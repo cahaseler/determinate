@@ -129,6 +129,8 @@ export interface DeciderMeta {
 	fallbackReason?: DeciderFallbackReason;
 	/** The decider's own failure message when it was unavailable or returned invalid output, e.g. "HTTP 429: ...". */
 	fallbackDetail?: string;
+	/** With `decided: "tool"`: the params the decider settled; the LLM was only asked for the others. */
+	settledParams?: string[];
 }
 
 export interface ActionMeta {

@@ -7,7 +7,7 @@ import type {
 	HistoryEntry,
 	ResolvedTool,
 } from "../types";
-import { describeClosedParams, MAX_CHOICE_OPTIONS } from "./closed-params";
+import { MAX_CHOICE_OPTIONS, surveyParams } from "./closed-params";
 import { buildQuestions, buildState, type Decision, resolveDecision } from "./questions";
 import {
 	askTypeSafe,
@@ -23,6 +23,8 @@ export interface DeciderOutcome {
 	action?: Action;
 	/** The chosen tool, when the LLM still has to fill its params. */
 	tool?: string;
+	/** Closed params of that tool the decider settled confidently; the LLM's schema is fixed to these values. */
+	settled?: Record<string, unknown>;
 }
 
 interface ConsultInput<TState> {
@@ -46,12 +48,26 @@ function judgeDecision<TState>(
 	decision: Decision,
 	tools: ResolvedTool<TState>[],
 	minConfidence: number,
-): Pick<DeciderMeta, "decided" | "confidence" | "fallbackReason"> & { action?: Action } {
-	const { tool, toolConfidence, params, paramsConfidence } = decision;
+): Pick<DeciderMeta, "decided" | "confidence" | "fallbackReason" | "settledParams"> & {
+	action?: Action;
+	settled?: Record<string, unknown>;
+} {
+	const { tool, toolConfidence, params, paramsConfidence, settled } = decision;
 	if (toolConfidence < minConfidence) {
 		return { decided: "none", confidence: toolConfidence, fallbackReason: "low-confidence" };
 	}
-	if (!params) return { decided: "tool", confidence: toolConfidence };
+	if (!params) {
+		const sure =
+			settled && settled.confidence >= minConfidence && Object.keys(settled.params).length > 0;
+		return sure
+			? {
+					decided: "tool",
+					confidence: Math.min(toolConfidence, settled.confidence),
+					settled: settled.params,
+					settledParams: Object.keys(settled.params),
+				}
+			: { decided: "tool", confidence: toolConfidence };
+	}
 	if (paramsConfidence < minConfidence) {
 		return { decided: "tool", confidence: toolConfidence, fallbackReason: "low-confidence" };
 	}
@@ -79,11 +95,16 @@ export async function consultDecider<TState>({
 	history,
 	signal,
 }: ConsultInput<TState>): Promise<DeciderOutcome | undefined> {
-	const deciderTools = tools.map(({ name, description, params }) => ({
-		name,
-		description,
-		closedParams: describeClosedParams(params, config),
-	}));
+	const deciderTools = tools.map(({ name, description, params }) => {
+		const survey = surveyParams(params, config);
+		return {
+			name,
+			description,
+			closedParams: survey?.complete ? survey.closed : undefined,
+			partialParams:
+				survey && !survey.complete && survey.closed.length > 0 ? survey.closed : undefined,
+		};
+	});
 	const question = typeof config.question === "function" ? config.question() : config.question;
 	const questions = buildQuestions(deciderTools, { question });
 	const isForced = Object.keys(questions).length === 0;
@@ -101,11 +122,16 @@ export async function consultDecider<TState>({
 		// One valid tool whose params each admit one value leaves nothing to ask.
 		response = isForced ? unanswered : await askTypeSafe({ config, body: request, signal });
 		const decision = resolveDecision(response.answers, deciderTools);
-		const { action, ...judged } = judgeDecision(decision, tools, config.minConfidence ?? 0);
+		const { action, settled, ...judged } = judgeDecision(
+			decision,
+			tools,
+			config.minConfidence ?? 0,
+		);
 		return {
 			request,
 			action,
 			tool: judged.decided === "tool" ? decision.tool : undefined,
+			settled,
 			meta: {
 				...judged,
 				model: response.model,
