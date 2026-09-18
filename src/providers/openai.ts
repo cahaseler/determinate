@@ -39,13 +39,24 @@ export class OpenAIProvider implements Provider {
 						},
 					},
 					...request.options,
+					...librarySettings(this.config, request.options),
 				},
 				{
 					signal: request.signal,
 				},
 			);
 
-			const content = response.choices[0]?.message?.content;
+			const choice = response.choices[0];
+			const content = choice?.message?.content;
+			if (choice?.finish_reason === "length") {
+				const used = response.usage?.completion_tokens;
+				const reasoning = response.usage?.completion_tokens_details?.reasoning_tokens;
+				throw new OutputError(
+					`The model reached its output limit (${used ?? "unknown"} tokens${reasoning ? `, ${reasoning} of them reasoning` : ""}) before finishing its answer. Lower reasoningEffort or raise max_tokens in the provider options.`,
+					content ?? "",
+					false,
+				);
+			}
 			if (!content) {
 				throw new OutputError("No content in response", "");
 			}
@@ -74,6 +85,24 @@ export class OpenAIProvider implements Provider {
 			throw err;
 		}
 	}
+}
+
+/** Request fields the library sets for a provider type. Anything the consumer's `options` say on the same point wins. */
+function librarySettings(
+	{ type, reasoningEffort }: ProviderConfig,
+	{ provider, reasoning, reasoning_effort }: Record<string, unknown> = {},
+): Record<string, unknown> {
+	if (type === "openrouter") {
+		return {
+			// OpenRouter otherwise routes to any host of the model, including ones that ignore
+			// response_format, and the model then answers in prose or in a JSON shape of its own.
+			provider: { require_parameters: true, ...(provider as object | undefined) },
+			...(reasoningEffort && !reasoning ? { reasoning: { effort: reasoningEffort } } : {}),
+		};
+	}
+	return type === "openai" && reasoningEffort && !reasoning_effort
+		? { reasoning_effort: reasoningEffort }
+		: {};
 }
 
 function serializeProviderError(error: unknown): string | undefined {

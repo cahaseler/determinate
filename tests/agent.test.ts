@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { z } from "zod";
-import { ValidationError } from "../src/errors";
+import { OutputError, ValidationError } from "../src/errors";
 import { createAgent } from "../src/index";
 
 const stateSchema = z.object({
@@ -132,6 +132,21 @@ describe("agent", () => {
 		expect(result.action).toEqual({ tool: "approve", params: { note: "fixed" } });
 		expect(requests).toHaveLength(2);
 		expect(requests[1].messages).toHaveLength(requests[0].messages.length + 1);
+	});
+
+	it("does not re-ask after output that a retry cannot fix", async () => {
+		const agent = createAgent(baseConfig);
+		agent.setState({ status: "pending", score: 0.5 });
+		let calls = 0;
+		(agent as unknown as { provider: { sendRequest: () => Promise<unknown> } }).provider = {
+			sendRequest: async () => {
+				calls++;
+				throw new OutputError("The model reached its output limit", "", false);
+			},
+		};
+
+		await expect(agent.nextAction()).rejects.toThrow("output limit");
+		expect(calls).toBe(1);
 	});
 
 	it("converts strict-provider null placeholders back to omitted optional params", async () => {

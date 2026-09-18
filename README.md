@@ -179,6 +179,25 @@ provider: { type: "anthropic", model: "claude-haiku-4-5-20251001", apiKey: proce
 
 // OpenRouter
 provider: { type: "openrouter", model: "anthropic/claude-sonnet-4-5", apiKey: process.env.OPENROUTER_API_KEY }
+
+// A cheap reasoning model as the decision maker
+provider: { type: "openrouter", model: "z-ai/glm-5.3-flash", apiKey: process.env.OPENROUTER_API_KEY, reasoningEffort: "low" }
+```
+
+### Reasoning models
+
+Set `reasoningEffort` (`"minimal" | "low" | "medium" | "high"`) when the model reasons before it answers. Picking one action from a short list rarely needs much thought, and the default effort is expensive in a way that is easy to miss: on a crowded decision, one cheap reasoning model spent 2,500 to 4,000 reasoning tokens and 37 to 92 seconds per call, and often reached `max_tokens` before writing any answer. At `"low"` the same request returned a valid action in 3 to 15 seconds with about 120 output tokens.
+
+It is sent as `reasoning.effort` on OpenRouter and `reasoning_effort` on OpenAI. Anthropic ignores it (thinking is off unless you enable it through `options`), and so does vLLM, which has no common setting; pass `chat_template_kwargs` through `options` there.
+
+An answer cut off by the output limit throws an `OutputError` that says so, with `retryable: false`, and is not re-asked: the same request would be cut off again.
+
+### OpenRouter routing
+
+OpenRouter serves one model from many hosts, and not all of them enforce `response_format`. A host that ignores it lets the model answer in prose, or in JSON of its own design. Requests therefore carry `provider: { require_parameters: true }`, which limits routing to hosts that declare support for every parameter sent. A few hosts declare support and still do not enforce the schema. If you see well-formed JSON in the wrong shape from one of them, exclude it; your `provider` settings are merged with the default:
+
+```typescript
+provider: { type: "openrouter", model, apiKey, options: { provider: { ignore: ["SomeHost"] } } }
 ```
 
 ### Schema Portability

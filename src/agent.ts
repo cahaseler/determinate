@@ -135,7 +135,7 @@ export class Agent<TState> {
 				}
 				return response;
 			} catch (err) {
-				if (!(err instanceof OutputError) || attempt >= outputRetries) throw err;
+				if (!(err instanceof OutputError) || !err.retryable || attempt >= outputRetries) throw err;
 				retryMessages.push({
 					role: "user",
 					content: `Your previous response was invalid: ${err.message}. Respond only with one JSON object that exactly matches the supplied schema.`,

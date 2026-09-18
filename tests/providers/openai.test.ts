@@ -108,6 +108,103 @@ describe("OpenAI provider", () => {
 		expect(result.action).toHaveProperty("params");
 	});
 
+	describe("request defaults", () => {
+		const schema = { type: "object", properties: {}, additionalProperties: false };
+		const reply = (choice: object, usage: object = {}) =>
+			Response.json({ id: "x", object: "chat.completion", model: "m", choices: [choice], usage });
+		const action = JSON.stringify({ tool: "approve_order", params: {} });
+
+		/** Sends one request through a provider and returns the body the server received. */
+		const sentBody = async (config: Partial<ConstructorParameters<typeof OpenAIProvider>[0]>) => {
+			const bodies: Record<string, unknown>[] = [];
+			const capture = Bun.serve({
+				port: 0,
+				fetch: async (req) => {
+					bodies.push((await req.json()) as Record<string, unknown>);
+					return reply({
+						index: 0,
+						message: { role: "assistant", content: action },
+						finish_reason: "stop",
+					});
+				},
+			});
+			try {
+				const provider = new OpenAIProvider({
+					type: "openai",
+					model: "m",
+					apiKey: "test-key",
+					baseUrl: `http://localhost:${capture.port}/v1`,
+					...config,
+				});
+				await provider.sendRequest({
+					messages: [{ role: "user", content: "test" }],
+					outputSchema: schema,
+					model: "m",
+					options: config.options,
+				});
+				return bodies[0] ?? {};
+			} finally {
+				capture.stop();
+			}
+		};
+
+		it("sends reasoningEffort in each provider's own form", async () => {
+			expect(await sentBody({ type: "openai", reasoningEffort: "low" })).toMatchObject({
+				reasoning_effort: "low",
+			});
+			expect(await sentBody({ type: "openrouter", reasoningEffort: "low" })).toMatchObject({
+				reasoning: { effort: "low" },
+			});
+			const vllm = await sentBody({ type: "vllm", reasoningEffort: "low" });
+			expect(vllm).not.toHaveProperty("reasoning");
+			expect(vllm).not.toHaveProperty("reasoning_effort");
+		});
+
+		it("asks OpenRouter for hosts that honour the request's parameters, unless options say otherwise", async () => {
+			expect(await sentBody({ type: "openrouter" })).toMatchObject({
+				provider: { require_parameters: true },
+			});
+			expect(await sentBody({ type: "openai" })).not.toHaveProperty("provider");
+			expect(
+				await sentBody({ type: "openrouter", options: { provider: { only: ["some-host"] } } }),
+			).toMatchObject({ provider: { only: ["some-host"], require_parameters: true } });
+			expect(
+				await sentBody({
+					type: "openrouter",
+					options: { provider: { require_parameters: false } },
+				}),
+			).toMatchObject({ provider: { require_parameters: false } });
+		});
+
+		it("reports a truncated answer as not worth retrying", async () => {
+			const truncating = Bun.serve({
+				port: 0,
+				fetch: () =>
+					reply(
+						{ index: 0, message: { role: "assistant", content: null }, finish_reason: "length" },
+						{ completion_tokens: 2048, completion_tokens_details: { reasoning_tokens: 2048 } },
+					),
+			});
+			try {
+				const provider = new OpenAIProvider({
+					type: "openrouter",
+					model: "m",
+					apiKey: "test-key",
+					baseUrl: `http://localhost:${truncating.port}/v1`,
+				});
+				await expect(
+					provider.sendRequest({ messages: [], outputSchema: schema, model: "m" }),
+				).rejects.toMatchObject({
+					name: "OutputError",
+					retryable: false,
+					message: expect.stringContaining("2048 of them reasoning"),
+				});
+			} finally {
+				truncating.stop();
+			}
+		});
+	});
+
 	it("preserves structured provider error details", async () => {
 		const failingServer = Bun.serve({
 			port: 0,

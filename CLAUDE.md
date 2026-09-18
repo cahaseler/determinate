@@ -37,6 +37,8 @@ Consumer Loop
 - **OpenAI provider** uses the official OpenAI SDK. Handles OpenAI, vLLM, and OpenRouter via `baseUrl`.
 - **State is not sent to the model** — state is only passed to `instructions(state)` and `validWhen(state)`. The consumer controls what the model sees through the instructions function.
 - **The decider (TypeSafe Jev) sits beside the provider, not in place of it.** Jev only chooses among declared options (Choice questions, max 255 options) and cannot produce strings or numbers, so `AgentConfig.decider` is optional and `provider` stays mandatory. `decider/closed-params.ts` decides per tool whether every param is closed-set (enum, literal, boolean, nullable/optional of those) by inspecting `z.toJSONSchema(params, { io: "input" })`. One request carries the tool question plus param questions for every closed-set tool, because Jev answers questions in parallel and cannot condition one on another. Optional params get an extra `(unset)` option. Decider answers go through the same per-tool Zod validation as LLM output. Transient decider failures fall back to the LLM; 4xx rejections throw, so a bad key is not masked by a working LLM.
+- **`reasoningEffort` is a first-class provider setting**, translated per provider in `openai.ts` (`reasoning.effort` on OpenRouter, `reasoning_effort` on OpenAI; ignored for Anthropic and vLLM). Cheap reasoning models at default effort spend thousands of tokens per decision and often hit `max_tokens` before answering, which surfaces as timeouts. A response with `finish_reason: "length"` throws an `OutputError` with `retryable: false`, and `askProvider` does not re-ask after it.
+- **OpenRouter requests carry `provider.require_parameters: true`**, merged with any `options.provider` the consumer gives. Without it OpenRouter routes to hosts that ignore `response_format`. Some hosts declare support and still return off-schema JSON; the remedy is `options.provider.ignore`, not parsing looser output.
 - **Token budgeting** rejects (throws `BudgetExceededError`) if any section (instructions, history, tools) exceeds its budget. No silent truncation.
 - **OAuth** extracted from pi-ai (MIT). Supports Anthropic and OpenAI device code flows. Tokens stored at `~/.determinate/` with 0o600 permissions.
 - **Node.js 22+ floor** since the openai SDK v7 bump. The OpenAI client also rejects an empty `apiKey` at construction, so `openai.ts` substitutes a placeholder to keep keyless self-hosted (vLLM) endpoints working.
@@ -75,7 +77,7 @@ src/
     anthropic.ts        Anthropic OAuth flow
     openai.ts           OpenAI OAuth flow (local callback server)
     token-store.ts      Filesystem credential storage
-tests/                  Mirrors src/ structure, 124 unit tests
+tests/                  Mirrors src/ structure, 128 unit tests
 scripts/
   e2e-live.ts           Live tests against real providers (vLLM, OpenAI, Anthropic, OpenRouter, TypeSafe)
   bench-decider.ts      Decider vs LLM accuracy, latency and confidence calibration
@@ -84,7 +86,7 @@ scripts/
 ## Commands
 
 - `bun run build` — Compile TypeScript to `dist/` (JS + declarations + source maps)
-- `bun test` — Run all tests (124 tests, ~5s)
+- `bun test` — Run all tests (128 tests, ~5s)
 - `bun run lint` — Lint with Biome
 - `bun run lint:fix` — Auto-fix lint issues
 - `bun run typecheck` — Type check without emitting
