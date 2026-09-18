@@ -366,6 +366,65 @@ describe("agent with a decider", () => {
 		).rejects.toThrow(OutputError);
 	});
 
+	it("settles the closed params of a tool that also has free text, and fixes them for the LLM", async () => {
+		const report = {
+			name: "report",
+			description: "Report back",
+			params: z.object({
+				outcome: z.enum(["complete", "not_possible"]).describe("How it went"),
+				reason: z.string(),
+			}),
+			validWhen: () => true,
+		};
+		answerWith({
+			tool: answer("report", 0.9),
+			"param:report:outcome": answer("not_possible", 0.85),
+		});
+		llmAction = { tool: "report", params: { outcome: "not_possible", reason: "No station here" } };
+		const agent = createTestAgent({ minConfidence: 0.5, agentTools: [report, ...tools] });
+
+		const result = await agent.nextAction();
+
+		expect(result.action).toEqual({
+			tool: "report",
+			params: { outcome: "not_possible", reason: "No station here" },
+		});
+		expect(llmToolEnum()).toEqual(["report"]);
+		const schema = JSON.stringify(llmRequests[0]?.response_format);
+		expect(schema).toContain(
+			'"outcome":{"type":"string","enum":["not_possible"],"description":"How it went"}',
+		);
+		expect(result.meta.decider).toMatchObject({
+			decided: "tool",
+			confidence: 0.85,
+			settledParams: ["outcome"],
+		});
+		expect(Object.keys(deciderRequests[0]?.body.questions as Body)).toContain(
+			"param:report:outcome",
+		);
+	});
+
+	it("leaves a mixed tool's params to the LLM when its settled answer is unsure", async () => {
+		const report = {
+			name: "report",
+			description: "Report back",
+			params: z.object({ outcome: z.enum(["complete", "not_possible"]), reason: z.string() }),
+			validWhen: () => true,
+		};
+		answerWith({
+			tool: answer("report", 0.9),
+			"param:report:outcome": answer("complete", 0.4),
+		});
+		llmAction = { tool: "report", params: { outcome: "not_possible", reason: "Nothing here" } };
+		const agent = createTestAgent({ minConfidence: 0.5, agentTools: [report, ...tools] });
+
+		const result = await agent.nextAction();
+
+		expect(result.action.params).toEqual({ outcome: "not_possible", reason: "Nothing here" });
+		expect(result.meta.decider).toMatchObject({ decided: "tool", confidence: 0.9 });
+		expect(result.meta.decider?.settledParams).toBeUndefined();
+	});
+
 	it("includes the decider request in verbose output", async () => {
 		answerWith({ tool: answer("close") });
 

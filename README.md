@@ -237,6 +237,8 @@ Whatever Jev picks is validated against the tool's Zod schema like any LLM outpu
 
 Two things widen what counts as closed-set. State-dependent `params` (above) turn ID strings into enums Jev can choose from. And `decider.omitOptionalFreeForm: true` leaves optional free-form params unset rather than sending the tool to the LLM, which suits tools that carry something like an optional `note` or `thoughts` string. Leave it off when an optional string is the point of the tool.
 
+A tool with both kinds of param, such as `report({ outcome: enum, reason: string })`, is split: Jev is asked about its closed params along with the tool, and when it settles them above `minConfidence` the LLM is asked for that tool only, with those params fixed to Jev's values in its schema. The LLM writes the free text to match. `meta.decider.settledParams` names them.
+
 Three things matter in practice, all observed running `scripts/bench-decider.ts` (51 scenarios with known answers) against the live API:
 
 - **Set `minConfidence`.** Jev's confidence tracked correctness closely. Every answer it gave at 0.5 or above was right, and every miss came in under 0.35. A threshold between 0.5 and 0.7 sent those misses to the LLM at the cost of a handful of extra LLM calls.

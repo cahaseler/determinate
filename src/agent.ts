@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { assembleContext } from "./context/assembler";
 import { createTokenizer, type Tokenizer } from "./context/tokenizer";
 import { consultDecider } from "./decider/decide";
@@ -6,12 +7,14 @@ import { getOAuthApiKey } from "./oauth/index";
 import { createProvider } from "./providers/factory";
 import type { Provider, ProviderResponse } from "./providers/types";
 import { type ValidatedHistoryEntry, validateHistory } from "./schema/history-schema";
+import { describeIssues } from "./schema/issues";
 import type {
 	ActionResult,
 	AgentConfig,
 	HistoryEntry,
 	ModelPricing,
 	NextActionOptions,
+	ResolvedTool,
 	TokenUsage,
 	ToolDefinition,
 	VerboseActionResult,
@@ -59,9 +62,7 @@ export class Agent<TState> {
 	setState(state: TState): void {
 		const result = this.config.state.safeParse(state);
 		if (!result.success) {
-			throw new ValidationError(
-				`Invalid state: ${result.error.issues.map((i) => i.message).join(", ")}`,
-			);
+			throw new ValidationError(`Invalid state: ${describeIssues(result.error.issues)}`);
 		}
 		this.state = result.data as TState;
 	}
@@ -127,7 +128,7 @@ export class Agent<TState> {
 					}
 					if (!paramsResult.success) {
 						throw new OutputError(
-							`Params for tool "${response.action.tool}" failed validation: ${paramsResult.error.issues.map((i) => i.message).join(", ")}`,
+							`Params for tool "${response.action.tool}" failed validation: ${describeIssues(paramsResult.error.issues)}`,
 							JSON.stringify(response.action),
 						);
 					}
@@ -169,11 +170,14 @@ export class Agent<TState> {
 					})
 				: undefined;
 
-			// When the decider settled the tool but not its params, the LLM only sees that tool.
+			// When the decider settled the tool but not all its params, the LLM only sees that tool,
+			// with any params the decider settled fixed to their values.
 			const asked = decided?.tool
 				? this.assemble(
 						state,
-						assembled.tools.filter(({ name }) => name === decided.tool),
+						assembled.tools
+							.filter(({ name }) => name === decided.tool)
+							.map((tool) => fixParams(tool, decided.settled)),
 					)
 				: assembled;
 			const response = decided?.action
@@ -224,6 +228,24 @@ export class Agent<TState> {
 			throw err;
 		}
 	}
+}
+
+/** Narrows a tool's params schema so the given params admit only the decider's values. */
+function fixParams<TState>(
+	tool: ResolvedTool<TState>,
+	settled: Record<string, unknown> | undefined,
+): ResolvedTool<TState> {
+	const { params } = tool;
+	if (!settled || !(params instanceof z.ZodObject)) return tool;
+	const shape = params.shape as Record<string, z.ZodType>;
+	const fixed = Object.fromEntries(
+		Object.entries(settled).map(([name, value]) => {
+			const literal = z.literal(value as z.core.util.Literal);
+			const description = shape[name]?.description;
+			return [name, description ? literal.describe(description) : literal];
+		}),
+	);
+	return { ...tool, params: params.extend(fixed) };
 }
 
 const priceUsage = ({ input, output }: TokenUsage, pricing: ModelPricing): number =>

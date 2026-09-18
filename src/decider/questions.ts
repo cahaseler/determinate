@@ -9,6 +9,8 @@ export interface DeciderTool {
 	description: string;
 	/** Undefined when the tool has free-form params the decider cannot fill. */
 	closedParams?: ClosedParam[];
+	/** The closed params of a tool that also has free-form ones; the decider settles these and the LLM writes the rest. */
+	partialParams?: ClosedParam[];
 }
 
 export interface ChoiceQuestion {
@@ -31,6 +33,8 @@ export interface Decision {
 	params?: Record<string, unknown>;
 	/** Lowest confidence among the chosen tool's param answers; 1 when none were needed. */
 	paramsConfidence: number;
+	/** For a tool with free-form params: the closed ones the decider answered, and how surely. */
+	settled?: { params: Record<string, unknown>; confidence: number };
 }
 
 /** Components are encoded so names containing ":" cannot make two params share an ID. */
@@ -74,7 +78,7 @@ export function buildQuestions(
 	{ question = DEFAULT_TOOL_QUESTION }: { question?: string } = {},
 ): Record<string, ChoiceQuestion> {
 	const paramQuestions = tools.flatMap((tool) =>
-		(tool.closedParams ?? [])
+		(tool.closedParams ?? tool.partialParams ?? [])
 			.filter(hasAlternatives)
 			.map((param) => [paramQuestionId(tool.name, param.name), askParam(tool, param)] as const),
 	);
@@ -135,21 +139,22 @@ export function resolveDecision(
 		toolProbabilities: toolAnswer.probabilities,
 		paramsConfidence: 1,
 	};
-	if (!tool?.closedParams) return decision;
+	const asked = tool?.closedParams ?? tool?.partialParams;
+	if (!tool || !asked) return decision;
 
-	const paramAnswers = tool.closedParams.map((param) => ({
+	const paramAnswers = asked.map((param) => ({
 		param,
 		...(hasAlternatives(param)
 			? readChoice(answers, paramQuestionId(tool.name, param.name), listOptions(param))
 			: { choice: listOptions(param)[0] ?? UNSET_OPTION, confidence: 1 }),
 	}));
-	return {
-		...decision,
-		params: Object.fromEntries(
-			paramAnswers
-				.filter(({ choice }) => choice !== UNSET_OPTION)
-				.map(({ param, choice }) => [param.name, param.values[choice]]),
-		),
-		paramsConfidence: Math.min(1, ...paramAnswers.map(({ confidence }) => confidence)),
-	};
+	const params = Object.fromEntries(
+		paramAnswers
+			.filter(({ choice }) => choice !== UNSET_OPTION)
+			.map(({ param, choice }) => [param.name, param.values[choice]]),
+	);
+	const confidence = Math.min(1, ...paramAnswers.map((answer) => answer.confidence));
+	return tool.closedParams
+		? { ...decision, params, paramsConfidence: confidence }
+		: { ...decision, settled: { params, confidence } };
 }

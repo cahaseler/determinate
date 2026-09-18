@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ValidationError } from "../errors";
+import { describeIssues } from "./issues";
 
 export const historyEntrySchema = z.object({
 	tool: z.string(),
@@ -16,9 +17,7 @@ const historyArraySchema = z.array(historyEntrySchema);
 export function validateHistory(input: unknown): ValidatedHistoryEntry[] {
 	const result = historyArraySchema.safeParse(input);
 	if (!result.success) {
-		throw new ValidationError(
-			`Invalid history format: ${result.error.issues.map((i) => i.message).join(", ")}`,
-		);
+		throw new ValidationError(`Invalid history format: ${describeIssues(result.error.issues)}`);
 	}
 	return result.data;
 }
