@@ -82,6 +82,43 @@ describe("createDecider", () => {
 		});
 	});
 
+	it("reaches Jev through OpenRouter's decisions endpoint with the same body, and takes the cost it reports", async () => {
+		let path = "";
+		const routed = Bun.serve({
+			port: 0,
+			fetch: async (req) => {
+				path = new URL(req.url).pathname;
+				requests.push({
+					authorization: req.headers.get("authorization"),
+					body: (await req.json()) as Body,
+				});
+				return Response.json({
+					model: "typesafe/jev-1.13-20260917",
+					answers: { choice: answer("a", 0.9) },
+					usage: { input_tokens: 371, output_tokens: 39, cost: 0.000015582 },
+					id: "gen-dec-1",
+					provider: "TypeSafe",
+				});
+			},
+		});
+		try {
+			const picked = await createDecider({
+				type: "openrouter",
+				apiKey: "or-key",
+				baseUrl: `http://localhost:${routed.port}`,
+			}).choose({ state: { x: 1 }, question: "Which?", options: { a: null, b: null } });
+
+			expect(path).toBe("/api/alpha/decisions");
+			expect(requests[0]?.authorization).toBe("Bearer or-key");
+			expect(requests[0]?.body).toMatchObject({ model: "typesafe/jev-1.13", state: { x: 1 } });
+			expect(picked).toMatchObject({ choice: "a", confidence: 0.9 });
+			expect(picked.meta.model).toBe("typesafe/jev-1.13-20260917");
+			expect(picked.meta.cost).toBeCloseTo(0.000015582);
+		} finally {
+			routed.stop();
+		}
+	});
+
 	it("choose asks one question and returns its answer with the meta", async () => {
 		respond = () =>
 			Response.json({ model: "jev-test", answers: { choice: answer("b", 0.6) }, usage: {} });

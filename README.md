@@ -226,6 +226,12 @@ const agent = createAgent({
 });
 ```
 
+Jev is also served through OpenRouter's decisions endpoint. Set `type: "openrouter"` with an OpenRouter key and the same requests go to `https://openrouter.ai/api/alpha/decisions` (model `typesafe/jev-1.13` by default; `~typesafe/jev-latest` is the alias), which returns the same answers plus the cost it charged, reported as `meta.decider.reportedCost` and folded into `meta.cost` when no `pricing` is configured. One key and one bill for the LLM and the decider.
+
+```typescript
+decider: { type: "openrouter", apiKey: process.env.OPENROUTER_API_KEY, minConfidence: 0.6 },
+```
+
 On each `nextAction()`, one request asks Jev which valid tool comes next and, for every tool whose params are all closed-set, what each param should be. A tool is closed-set when its params are all enums, literals, unions of literals, booleans, nullable or optional versions of those, or empty. Then:
 
 - **The chosen tool is closed-set.** The action is returned and the LLM is never called.
