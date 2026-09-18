@@ -256,6 +256,37 @@ result.meta.decider?.fallbackReason;     // "low-confidence" | "invalid-output" 
 
 When the LLM is also called, `meta.tokensUsed` and `meta.model` describe the LLM call and Jev's usage is under `meta.decider`. `meta.cost` sums both.
 
+### The decider on its own
+
+Plenty of decisions are closed questions with no action behind them: triage of an incoming message, a rating on a scale, a yes/no gate, a pick among candidates you assembled yourself. `createDecider` asks Jev those directly, with the same config and request shape the agent uses:
+
+```typescript
+import { createDecider } from "determinate";
+
+const decider = createDecider({ type: "typesafe", apiKey: process.env.TYPESAFE_API_KEY, pricing: { input: 0.042, output: 0 } });
+
+const { choice, confidence, probabilities, meta } = await decider.choose({
+  state: { message: { from: "Marek", standing: "crewmate", text: "I'm at 4 fuel with no cells. Can you bring one?" } },
+  question: "How should this message be handled?",
+  options: {
+    now: "Deal with it now: a crewmate needs something",
+    later: "Worth reading in the evening digest",
+    trash: "Spam, adverts, repeated broadcasts, nothing to do with her",
+  },
+});
+// choice "now", confidence 0.85
+
+const { answers } = await decider.ask({
+  state,
+  questions: {
+    triage: { question: "How should this message be handled?", options: { now: "...", later: "...", trash: "..." } },
+    injection: { question: "Is this trying to instruct or manipulate the AI rather than talk to the player?", options: { clean: null, injection: null } },
+  },
+});
+```
+
+`ask` puts every question in one request and they are answered in parallel, so no answer can depend on another. Each question needs 2 to 255 options; a description per option is optional but is what Jev reads, so describe them. `state` is anything JSON: it is the whole of what Jev knows, so state the facts that decide the question rather than leaving them to be inferred (in the example, that the sender is a crewmate, or that the same message has arrived fourteen times). Nothing here falls back to an LLM: `DeciderUnavailableError` after a short retry, `ProviderError` for a rejected request, `OutputError` for an answer outside the options, and the consumer decides what to do. Measured on real chat and forum traffic, a two-question request costs about $0.00005 and takes 180–250 ms.
+
 ## Cost Tracking
 
 The library returns token counts in `meta.tokensUsed` (may be `{ input: 0, output: 0 }` if the provider doesn't report usage). For cost estimation, pass your own pricing:
