@@ -70,6 +70,7 @@ src/
     openai.ts           OpenAI SDK wrapper (also vLLM, OpenRouter)
     anthropic.ts        Raw fetch Anthropic adapter with retry
     parse-action.ts     Shared { tool, params } parser, plus DeepSeek DSML recovery
+  schema/issues.ts      Names the allowed values when a union of literals fails validation
   oauth/
     index.ts            Registry, getOAuthApiKey() with token refresh
     types.ts            OAuth interfaces
@@ -77,7 +78,7 @@ src/
     anthropic.ts        Anthropic OAuth flow
     openai.ts           OpenAI OAuth flow (local callback server)
     token-store.ts      Filesystem credential storage
-tests/                  Mirrors src/ structure, 128 unit tests
+tests/                  Mirrors src/ structure, 131 unit tests
 scripts/
   e2e-live.ts           Live tests against real providers (vLLM, OpenAI, Anthropic, OpenRouter, TypeSafe)
   bench-decider.ts      Decider vs LLM accuracy, latency and confidence calibration
@@ -86,7 +87,7 @@ scripts/
 ## Commands
 
 - `bun run build` — Compile TypeScript to `dist/` (JS + declarations + source maps)
-- `bun test` — Run all tests (128 tests, ~5s)
+- `bun test` — Run all tests (131 tests, ~5s)
 - `bun run lint` — Lint with Biome
 - `bun run lint:fix` — Auto-fix lint issues
 - `bun run typecheck` — Type check without emitting

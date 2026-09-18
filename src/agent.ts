@@ -6,6 +6,7 @@ import { getOAuthApiKey } from "./oauth/index";
 import { createProvider } from "./providers/factory";
 import type { Provider, ProviderResponse } from "./providers/types";
 import { type ValidatedHistoryEntry, validateHistory } from "./schema/history-schema";
+import { describeIssues } from "./schema/issues";
 import type {
 	ActionResult,
 	AgentConfig,
@@ -59,9 +60,7 @@ export class Agent<TState> {
 	setState(state: TState): void {
 		const result = this.config.state.safeParse(state);
 		if (!result.success) {
-			throw new ValidationError(
-				`Invalid state: ${result.error.issues.map((i) => i.message).join(", ")}`,
-			);
+			throw new ValidationError(`Invalid state: ${describeIssues(result.error.issues)}`);
 		}
 		this.state = result.data as TState;
 	}
@@ -127,7 +126,7 @@ export class Agent<TState> {
 					}
 					if (!paramsResult.success) {
 						throw new OutputError(
-							`Params for tool "${response.action.tool}" failed validation: ${paramsResult.error.issues.map((i) => i.message).join(", ")}`,
+							`Params for tool "${response.action.tool}" failed validation: ${describeIssues(paramsResult.error.issues)}`,
 							JSON.stringify(response.action),
 						);
 					}
