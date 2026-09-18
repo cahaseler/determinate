@@ -11,9 +11,9 @@ import { MAX_CHOICE_OPTIONS, surveyParams } from "./closed-params";
 import { buildQuestions, buildState, type Decision, resolveDecision } from "./questions";
 import {
 	askTypeSafe,
-	DEFAULT_DECIDER_MODEL,
 	type DeciderResponse,
 	DeciderUnavailableError,
+	deciderModel,
 } from "./typesafe";
 
 export interface DeciderOutcome {
@@ -112,7 +112,7 @@ export async function consultDecider<TState>({
 		return undefined;
 	}
 
-	const model = config.model ?? DEFAULT_DECIDER_MODEL;
+	const model = deciderModel(config);
 	const request = { state: buildState({ instructions, history }), model, questions };
 	const unanswered: DeciderResponse = { answers: {}, tokensUsed: { input: 0, output: 0 }, model };
 	const start = performance.now();

@@ -2,7 +2,7 @@ import { ValidationError } from "../errors";
 import type { DeciderConfig, TokenUsage } from "../types";
 import { MAX_CHOICE_OPTIONS } from "./closed-params";
 import { type ChoiceAnswer, type ChoiceQuestion, readChoice } from "./questions";
-import { askTypeSafe, DEFAULT_DECIDER_MODEL } from "./typesafe";
+import { askTypeSafe, deciderModel } from "./typesafe";
 
 /** One closed question: what to decide, and the options with a description each (or none). */
 export interface Question {
@@ -76,7 +76,7 @@ const readAnswers = <Q extends string>(
  * `OutputError`. Nothing falls back to an LLM here: the consumer decides what to do.
  */
 export function createDecider(config: DeciderConfig): Decider {
-	const model = config.model ?? DEFAULT_DECIDER_MODEL;
+	const model = deciderModel(config);
 
 	const ask: Decider["ask"] = async ({ state, questions, signal }) => {
 		const body = {
@@ -100,7 +100,7 @@ export function createDecider(config: DeciderConfig): Decider {
 				latency: performance.now() - start,
 				cost: config.pricing
 					? (input * config.pricing.input + output * config.pricing.output) / 1_000_000
-					: undefined,
+					: response.cost,
 			},
 		};
 	};

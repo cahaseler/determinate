@@ -54,11 +54,13 @@ export interface ModelPricing {
  * Optional System One model (TypeSafe's Jev) consulted before the LLM. It picks
  * the tool, and fills the params too when they are all closed-set (enums,
  * literals, booleans). Anything it cannot express falls through to `provider`.
+ * Reached directly at TypeSafe (`type: "typesafe"`) or through OpenRouter's
+ * decisions endpoint (`type: "openrouter"`, with an OpenRouter key).
  */
 export interface DeciderConfig {
-	type: "typesafe";
+	type: "typesafe" | "openrouter";
 	apiKey: string;
-	/** Defaults to "jev-latest". */
+	/** Defaults to "jev-latest" at TypeSafe and "typesafe/jev-1.13" on OpenRouter. */
 	model?: string;
 	baseUrl?: string;
 	/** Answers below this confidence (0–1) are handed to the LLM instead. Unset accepts every answer. */
@@ -131,6 +133,8 @@ export interface DeciderMeta {
 	fallbackDetail?: string;
 	/** With `decided: "tool"`: the params the decider settled; the LLM was only asked for the others. */
 	settledParams?: string[];
+	/** What the route itself reported the request cost, when it reports one (OpenRouter does). */
+	reportedCost?: number;
 }
 
 export interface ActionMeta {
