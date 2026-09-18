@@ -105,7 +105,7 @@ export const buildState = ({
 	})),
 });
 
-function readChoice(
+export function readChoice(
 	answers: Record<string, ChoiceAnswer>,
 	id: string,
 	options: string[],

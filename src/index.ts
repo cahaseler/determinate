@@ -6,6 +6,9 @@ export function createAgent<TState>(config: AgentConfig<TState>): Agent<TState> 
 }
 
 export { Agent } from "./agent";
+export type { Answer, AskMeta, AskResult, Decider, Question } from "./decider/ask";
+export { createDecider } from "./decider/ask";
+export { DeciderUnavailableError } from "./decider/typesafe";
 
 export {
 	AbortError,
