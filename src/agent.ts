@@ -189,9 +189,10 @@ export class Agent<TState> {
 
 			const costs = [
 				response && pricing ? priceUsage(response.meta.tokensUsed, pricing) : undefined,
-				decided && decider?.pricing
-					? priceUsage(decided.meta.tokensUsed, decider.pricing)
-					: undefined,
+				decided?.meta.reportedCost ??
+					(decided && decider?.pricing
+						? priceUsage(decided.meta.tokensUsed, decider.pricing)
+						: undefined),
 			].filter((cost) => cost !== undefined);
 
 			const result: ActionResult = {

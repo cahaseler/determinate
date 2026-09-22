@@ -226,7 +226,7 @@ const agent = createAgent({
 });
 ```
 
-Jev is also served through OpenRouter's decisions endpoint. Set `type: "openrouter"` with an OpenRouter key and the same requests go to `https://openrouter.ai/api/alpha/decisions` (model `typesafe/jev-1.13` by default; `~typesafe/jev-latest` is the alias), which returns the same answers plus the cost it charged, reported as `meta.decider.reportedCost` and folded into `meta.cost` when no `pricing` is configured. One key and one bill for the LLM and the decider.
+Jev is also served through OpenRouter's decisions endpoint. Set `type: "openrouter"` with an OpenRouter key and the same requests go to `https://openrouter.ai/api/alpha/decisions` (model `typesafe/jev-1.13` by default; `~typesafe/jev-latest` is the alias), which returns the same answers plus the cost it charged, reported as `meta.decider.reportedCost` and used in `meta.cost` in place of any `pricing` estimate. One key and one bill for the LLM and the decider.
 
 ```typescript
 decider: { type: "openrouter", apiKey: process.env.OPENROUTER_API_KEY, minConfidence: 0.6 },

@@ -179,6 +179,26 @@ describe("agent with a decider", () => {
 		]);
 	});
 
+	it("takes the cost the route reports over the configured pricing", async () => {
+		respondAsDecider = () =>
+			Response.json({
+				model: "jev-1.13.0",
+				answers: {
+					tool: answer("set_priority", 0.9),
+					"param:set_priority:level": answer("high", 0.8),
+					"param:set_priority:notify": answer("(unset)", 0.85),
+				},
+				usage: { input_tokens: 1000, output_tokens: 30, cost: 0.00003 },
+			});
+		const agent = createTestAgent({ minConfidence: 0.5 });
+
+		const result = await agent.nextAction();
+
+		expect(llmRequests).toHaveLength(0);
+		expect(result.meta.decider?.reportedCost).toBeCloseTo(0.00003, 9);
+		expect(result.meta.cost).toBeCloseTo(0.00003, 9);
+	});
+
 	it("narrows the LLM call to the chosen tool when its params are free-form", async () => {
 		answerWith({ tool: answer("reply", 0.9) });
 
